@@ -1,4 +1,4 @@
-// リアルタイムで株数密度(本/m²)を自動計算
+// 株数密度(本/m²)のリアルタイム自動計算
 function updatePlantDensity() {
   const houseArea = parseFloat(document.getElementById('houseArea').value);
   const totalPlants = parseFloat(document.getElementById('totalPlantsInput').value);
@@ -12,6 +12,7 @@ function updatePlantDensity() {
   }
 }
 
+// 現在地取得
 function getCurrentLocation() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -29,7 +30,11 @@ function getCurrentLocation() {
   }
 }
 
+// 計算メイン処理
 async function calculateWaterAndFertilizer() {
+  // 密度の最新化
+  updatePlantDensity();
+
   const lat = document.getElementById('lat').value;
   const lon = document.getElementById('lon').value;
   const houseArea = parseFloat(document.getElementById('houseArea').value);
@@ -51,7 +56,7 @@ async function calculateWaterAndFertilizer() {
   }
 
   if (isNaN(plantDensity) || plantDensity <= 0) {
-    alert('株数密度の計算に失敗しました。入力値を確認してください');
+    alert('株数密度の計算に失敗しました。面積と総株数を確認してください');
     return;
   }
 
@@ -60,25 +65,25 @@ async function calculateWaterAndFertilizer() {
     return;
   }
 
-  // デフォルト気象値の設定
+  // デフォルト気象値
   let solarRadiationSum = 15.0;
   let fetchedTemp = 25.0;
   let fetchedHum = 65.0;
 
   try {
-    // Open-Meteo API呼び出し (日射量・気温)
-    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=shortwave_radiation_sum,temperature_2m_mean&timezone=auto`;
+    // Open-Meteo API呼び出し (パラメータを明確に指定)
+    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=shortwave_radiation_sum,temperature_2m_mean&forecast_days=1&timezone=auto`;
     const response = await fetch(apiUrl);
     
     if (response.ok) {
       const data = await response.json();
-      if (data.daily && data.daily.shortwave_radiation_sum) {
+      if (data && data.daily && data.daily.shortwave_radiation_sum) {
         solarRadiationSum = data.daily.shortwave_radiation_sum[0] ?? 15.0;
         fetchedTemp = data.daily.temperature_2m_mean[0] ?? 25.0;
       }
     }
   } catch (err) {
-    console.warn("Open-Meteo取得失敗のため標準値を使用します", err);
+    console.warn("Open-Meteo取得エラー。デフォルト値で計算を続行します:", err);
   }
 
   const finalTemp = inputTemp !== "" ? parseFloat(inputTemp) : fetchedTemp;
@@ -141,9 +146,11 @@ async function calculateWaterAndFertilizer() {
   document.getElementById('resTotalP').innerText = totalPKg.toFixed(2);
   document.getElementById('resTotalK').innerText = totalKKg.toFixed(2);
 
-  // 結果エリアを表示
+  // 結果表示
   document.getElementById('output').style.display = 'block';
 }
 
-// ページ読み込み時に株数密度の初期計算を実行
-window.onload = updatePlantDensity;
+// ページ読み込み完了時に自動計算を実行
+document.addEventListener('DOMContentLoaded', () => {
+  updatePlantDensity();
+});
