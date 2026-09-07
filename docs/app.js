@@ -3,7 +3,7 @@ import { calcCucumberLAI } from "../src/lai_cucumber.js";
 import { calcIrrigationFromEnv } from "../src/irrigation.js";
 import { calcNPK } from "../src/fertilization.js";
 
-// 単純な折れ線グラフ描画
+// 折れ線グラフ
 function drawLineGraph(id, data, label) {
   const width = document.getElementById(id).clientWidth;
   const height = 200;
@@ -55,6 +55,34 @@ function drawNPKGraph(id, Ndata, Pdata, Kdata) {
   svg.append("text").attr("x", 170).attr("y", 15).text("K（カリ）").attr("fill", "green");
 }
 
+// 収量予測グラフ
+function drawYieldGraph(id, data, label) {
+  const width = document.getElementById(id).clientWidth;
+  const height = 200;
+  const svg = d3.select(`#${id}`).attr("width", width).attr("height", height);
+  svg.selectAll("*").remove();
+
+  const x = d3.scaleLinear().domain([0, data.length - 1]).range([30, width - 10]);
+  const y = d3.scaleLinear().domain([0, d3.max(data)]).range([height - 30, 10]);
+
+  const line = d3.line()
+    .x((d, i) => x(i))
+    .y(d => y(d));
+
+  svg.append("path")
+    .datum(data)
+    .attr("fill", "none")
+    .attr("stroke", "purple")
+    .attr("stroke-width", 2)
+    .attr("d", line);
+
+  svg.append("text")
+    .attr("x", 10)
+    .attr("y", 15)
+    .text(label)
+    .attr("font-size", "12px");
+}
+
 // NPKテーブル更新
 function updateNPKTable(N, P, K) {
   const tbody = document.querySelector("#npkTable tbody");
@@ -68,8 +96,18 @@ function updateNPKTable(N, P, K) {
 }
 
 document.getElementById("calcGraph").onclick = async () => {
+
+  const crop = document.getElementById("crop").value;
+
+  const cropFactor = {
+    cucumber: 1.0,
+    tomato: 0.85,
+    pepper: 0.75,
+    strawberry: 0.55
+  }[crop];
+
   const env = await loadEnv();
-  const leafAges = [10, 15, 20, 25]; // 仮の葉齢配列
+  const leafAges = [10, 15, 20, 25];
   const LAI = calcCucumberLAI(leafAges);
 
   const temp = parseFloat(document.getElementById("temp").value) || null;
@@ -83,10 +121,10 @@ document.getElementById("calcGraph").onclick = async () => {
     plant_density,
     ground_area,
     leaching: 1.1,
-    crop_factor: 1.0
+    crop_factor: cropFactor
   });
 
-  const fert = calcNPK(result.ET, "cucumber");
+  const fert = calcNPK(result.ET, crop);
 
   const sw = env.shortwave.slice(0, 24);
   const tArr = env.temp.slice(0, 24);
@@ -94,21 +132,27 @@ document.getElementById("calcGraph").onclick = async () => {
   const Ndata = Array(24).fill(fert.N);
   const Pdata = Array(24).fill(fert.P);
   const Kdata = Array(24).fill(fert.K);
+  const yieldData = Array(24).fill(fert.Y);
 
   drawLineGraph("graphSW", sw, "短波放射 (W/m2)");
   drawLineGraph("graphT", tArr, "気温 (℃)");
   drawLineGraph("graphIrr", irrArr, "潅水量 (L/株/day)");
   drawNPKGraph("graphNPK", Ndata, Pdata, Kdata);
+  drawYieldGraph("graphYield", yieldData, "収量予測 (kg/株/day)");
   updateNPKTable(fert.N, fert.P, fert.K);
 
   document.getElementById("output").textContent =
-    `LAI: ${LAI.toFixed(2)}
+    `作物: ${crop}
+LAI: ${LAI.toFixed(2)}
 DLI: ${result.DLI.toFixed(1)} mol/m2/day
 気温: ${result.T.toFixed(1)} ℃
 湿度: ${result.RH.toFixed(1)} %
 VPD: ${result.VPD.toFixed(2)} kPa
 ET: ${result.ET.toFixed(2)} L/m2/day
 潅水量: ${result.irrigation_per_plant.toFixed(2)} L/株/day
+
+--- 収量予測モデル ---
+収量推定: ${fert.Y.toFixed(2)} kg/株/day
 
 --- 収量比例施肥 ---
 N: ${fert.N.toFixed(2)} g/株/day
@@ -153,23 +197,3 @@ document.getElementById("pngBtn").onclick = () => {
   };
   img.src = "data:image/svg+xml;base64," + btoa(svgData);
 };
-
-const fert = calcNPK(result.ET, crop);
-
-document.getElementById("output").textContent =
-`作物: ${crop}
-LAI: ${LAI.toFixed(2)}
-DLI: ${result.DLI.toFixed(1)} mol/m2/day
-気温: ${result.T.toFixed(1)} ℃
-湿度: ${result.RH.toFixed(1)} %
-VPD: ${result.VPD.toFixed(2)} kPa
-ET: ${result.ET.toFixed(2)} L/m2/day
-潅水量: ${result.irrigation_per_plant.toFixed(2)} L/株/day
-
---- 収量予測モデル ---
-収量推定: ${fert.Y.toFixed(2)} kg/株/day
-
---- 収量比例施肥 ---
-N: ${fert.N.toFixed(2)} g/株/day
-P: ${fert.P.toFixed(2)} g/株/day
-K: ${fert.K.toFixed(2)} g/株/day`;
