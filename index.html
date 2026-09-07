@@ -4,25 +4,87 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>キュウリ潅水・施肥計算アプリ</title>
+  <!-- html2canvasライブラリ（PNG画像キャプチャ用） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
-    body { font-family: sans-serif; max-width: 650px; margin: 20px auto; padding: 15px; line-height: 1.5; color: #333; }
-    .card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fafafa; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    input, select { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 680px; margin: 20px auto; padding: 15px; line-height: 1.5; color: #333; background-color: #f4f7f6; }
+    h2 { color: #2c3e50; border-bottom: 3px solid #28a745; padding-bottom: 8px; }
+    .card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 18px; margin-bottom: 18px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    label { display: block; margin-top: 12px; font-weight: bold; color: #495057; }
+    input, select { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 5px; font-size: 15px; }
     input[readonly] { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
-    button { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 15px; }
+    button { background: #28a745; color: white; border: none; padding: 14px; width: 100%; border-radius: 6px; font-size: 17px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: background 0.2s; }
     button:hover { background: #218838; }
-    .result { background: #e9f7ef; border-left: 5px solid #28a745; padding: 15px; margin-top: 20px; }
+    
+    .btn-secondary { background: #6c757d; margin-top: 5px; }
+    .btn-secondary:hover { background: #5a6268; }
+
+    .btn-png { background: #17a2b8; margin-top: 0; padding: 8px 16px; width: auto; font-size: 14px; }
+    .btn-png:hover { background: #138496; }
+
+    .json-flex { display: flex; gap: 10px; flex-wrap: wrap; }
+    .json-flex > div { flex: 1; min-width: 200px; }
+
+    .result { background: #ffffff; border: 1px solid #28a745; border-radius: 10px; padding: 20px; margin-top: 20px; box-shadow: 0 4px 12px rgba(40,167,69,0.15); }
     .note { font-size: 0.85em; color: #666; font-weight: normal; }
-    .highlight { font-weight: bold; color: #155724; font-size: 1.1em; border-top: 1px solid #c3e6cb; padding-top: 10px; margin-top: 15px; }
-    .info-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-top: 20px; font-size: 0.9em; }
+
+    /* サマリーヘッダー用レスポンシブ配置 */
+    .summary-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 15px; }
+    .summary-title-area { flex: 1; min-width: 240px; }
+    .summary-period-badge { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; border-radius: 6px; padding: 6px 12px; font-size: 0.9em; font-weight: bold; margin-top: 6px; display: inline-block; }
+
+    /* --- 視覚化コンポーネント用スタイル --- */
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 15px 0; }
+    .metric-card { background: #f8f9fa; border-radius: 8px; padding: 12px; border-left: 4px solid #28a745; text-align: center; }
+    .metric-card.water { border-left-color: #007bff; background: #f0f7ff; }
+    .metric-card.fertilizer { border-left-color: #28a745; background: #f0fff4; }
+    .metric-card.harvest { border-left-color: #17a2b8; background: #f0fbff; }
+    .metric-title { font-size: 0.85em; color: #666; font-weight: bold; }
+    .metric-value { font-size: 1.5em; font-weight: bold; margin: 5px 0; color: #212529; }
+    .metric-sub { font-size: 0.8em; color: #6c757d; }
+    .metric-sub.highlight { color: #0056b3; font-weight: bold; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #b8daff; }
+
+    /* 養分バランス関係図用スタイル */
+    .balance-card { background: #f4fbf7; border: 1px solid #b7eb8f; border-radius: 8px; padding: 15px; margin: 15px 0; }
+    .balance-title { font-weight: bold; color: #276749; font-size: 0.95em; margin-bottom: 8px; text-align: center; }
+
+    /* プログレスバー */
+    .bar-container { margin: 8px 0; }
+    .bar-label { display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 3px; font-weight: bold; }
+    .progress-bg { background: #e9ecef; border-radius: 10px; height: 12px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease-in-out; }
+    .fill-n { background: #28a745; }
+    .fill-p { background: #17a2b8; }
+    .fill-k { background: #fd7e14; }
+
+    .info-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-top: 20px; font-size: 0.88em; }
     .info-box h4 { margin-top: 0; color: #495057; border-bottom: 2px solid #28a745; padding-bottom: 5px; }
     .info-box ul { padding-left: 20px; margin-bottom: 0; }
+
+    .academic-box { background: #eef6fc; border: 1px solid #b8daff; border-radius: 6px; padding: 15px; margin-top: 15px; font-size: 0.85em; color: #004085; }
+    .academic-box h4 { margin: 0 0 8px 0; color: #0056b3; display: flex; align-items: center; gap: 5px; }
+    .academic-box a { color: #0056b3; text-decoration: underline; font-weight: bold; }
+    .academic-box a:hover { color: #002752; }
   </style>
 </head>
 <body>
 
-  <h2>キュウリ 潅水・施肥量計算機</h2>
+  <h2>🥒 キュウリ 潅水・施肥量計算機</h2>
+
+  <!-- JSON保存・読み込みエリア -->
+  <div class="card" style="background: #eef9f1; border-color: #c3e6cb;">
+    <h3 style="margin-top:0; color: #155724;">💾 設定パラメータの入出力 (JSON)</h3>
+    <div class="json-flex">
+      <div>
+        <label>設定を出力 (エクスポート):</label>
+        <button type="button" class="btn-secondary" onclick="exportParamsJSON()">JSONファイルを保存</button>
+      </div>
+      <div>
+        <label>設定を読み込み (インポート):</label>
+        <input type="file" id="jsonFileInput" accept=".json" onchange="importParamsJSON(event)" style="padding: 7px;">
+      </div>
+    </div>
+  </div>
 
   <div class="card">
     <h3>1. 位置情報設定</h3>
@@ -50,6 +112,21 @@
       <input type="number" id="plantDensity" value="3.00" readonly>
     </label>
 
+    <label>設備潅水量 (L/分) <span class="note">※1分間にハウス全体へ給水される流量</span>:
+      <input type="number" step="0.1" id="flowRate" value="50.0" required>
+    </label>
+
+    <label>潅水周期 (日):
+      <select id="intervalDays">
+        <option value="1">1日ごと (毎日)</option>
+        <option value="2">2日ごと</option>
+        <option value="3" selected>3日ごと</option>
+        <option value="4">4日ごと</option>
+        <option value="5">5日ごと</option>
+        <option value="7">7日ごと</option>
+      </select>
+    </label>
+
     <label>LAI (葉面積指数 m²/m²) <span class="note">※育苗期: 0.5〜1.0 / 収穫期: 3.0〜4.5</span>:
       <input type="number" step="0.1" id="lai" value="3.5" required>
     </label>
@@ -58,7 +135,12 @@
       <select id="fertilizerType">
         <option value="black">トミー液肥ブラック (N:10% - P:4% - K:6%)</option>
         <option value="green">トミー液肥グリーン (N:6% - P:8% - K:8%)</option>
+        <option value="okf1">OK-F-1 (N:15% - P:8% - K:17%)</option>
       </select>
+    </label>
+
+    <label>期間内のハウス全体の予定収穫量 (kg) <span class="note">※任意入力</span>:
+      <input type="number" step="0.1" id="harvestKg" value="150" placeholder="例: 150">
     </label>
   </div>
 
@@ -74,67 +156,180 @@
     </label>
   </div>
 
-  <button type="button" onclick="calculateWaterAndFertilizer()">計算実行</button>
+  <button type="button" onclick="calculateWaterAndFertilizer()">🚀 計算実行</button>
 
   <div id="output" class="result" style="display:none;">
-    <h3>計算結果</h3>
-    <p><strong>適用環境データ:</strong></p>
-    <ul>
-      <li>日射量: <span id="resSolar"></span> MJ/m²</li>
-      <li>気温: <span id="resTemp"></span> °C (<span id="sourceTemp"></span>)</li>
-      <li>湿度: <span id="resHum"></span> % (<span id="sourceHum"></span>)</li>
-      <li>LAI: <span id="resLAI"></span></li>
-      <li>総株数: <span id="resTotalPlants"></span> 株</li>
-    </ul>
+    <!-- ヘッダーエリア：日付・対象日数明記 ＆ PNGダウンロードボタン -->
+    <div class="summary-header">
+      <div class="summary-title-area">
+        <h3 style="margin:0; color:#2c3e50;">📊 計算・管理ビジュアルサマリー</h3>
+        <div class="summary-period-badge">
+          📅 計算対象: <span id="summaryPeriodDates">----/--/-- 〜 ----/--/--</span> (<span id="summaryPeriodDays">0</span>日分の施肥潅水量)
+        </div>
+      </div>
+      <div>
+        <button type="button" class="btn-png" onclick="downloadSummaryPNG()">🖼 サマリーをPNG保存</button>
+      </div>
+    </div>
 
-    <p><strong>【単位面積・1株あたり管理量 (1日)】</strong></p>
-    <ul>
-      <li><strong>必要潅水量:</strong> <span id="resWaterM2"></span> L/m² (<span id="resWaterPlant"></span> L/株)</li>
-      <li><strong>1株あたり施肥目安量 (成分量):</strong>
-        <ul>
-          <li>窒素 (N): <span id="resN"></span> g/株</li>
-          <li>リン酸 (P): <span id="resP"></span> g/株</li>
-          <li>カリウム (K): <span id="resK"></span> g/株</li>
-        </ul>
-      </li>
-    </ul>
+    <!-- 主要指標のハイライトカード -->
+    <div class="metric-grid">
+      <div class="metric-card water">
+        <div class="metric-title">💧 1回あたり(指定周期)の総潅水量</div>
+        <div class="metric-value"><span id="cardTotalWaterL">0</span> <span style="font-size:0.6em;">L</span></div>
+        <div class="metric-sub"><span id="cardWaterM2">0</span> L/m² (<span id="cardWaterPlant">0</span> L/株)</div>
+        <div class="metric-sub highlight">⏱ 稼働時間: <span id="cardWaterTime">0</span> (<span id="cardIntervalText">1日ごと</span>)</div>
+      </div>
 
-    <p class="highlight"><strong>【ハウス全体での1日合計管理量】</strong></p>
-    <ul>
-      <li><strong>総潅水量:</strong> <span id="resTotalWaterL"></span> L (<span id="resTotalWaterTon"></span> m³/t)</li>
-      <li><strong>総施肥量 (純成分量):</strong>
-        <ul>
-          <li>窒素 (N): <span id="resTotalN"></span> kg</li>
-          <li>リン酸 (P): <span id="resTotalP"></span> kg</li>
-          <li>カリウム (K): <span id="resTotalK"></span> kg</li>
-        </ul>
-      </li>
-      <li><strong>選択液肥使用量 (<span id="resFertName"></span>):</strong>
-        <ul>
-          <li>必要液肥量: <strong style="color: #155724;"><span id="resFertL"></span> L</strong> （約 <span id="resFertKg"></span> kg）</li>
-          <li>希釈倍率目安: 約 <span id="resDilution"></span> 倍（潅水量に対して）</li>
-        </ul>
-      </li>
-    </ul>
+      <div class="metric-card fertilizer">
+        <div class="metric-title">🧪 選択液肥使用量</div>
+        <div class="metric-value"><span id="cardFertL">0</span> <span style="font-size:0.6em;">L</span></div>
+        <div class="metric-sub"><span id="cardFertName">液肥</span> (約<span id="cardFertKg">0</span>kg) / <span id="cardDilution">0</span>倍</div>
+      </div>
+
+      <div class="metric-card harvest">
+        <div class="metric-title">🥒 果実養分持ち出し</div>
+        <div class="metric-value"><span id="cardDryMatter">0</span> <span style="font-size:0.6em;">kg乾物</span></div>
+        <div class="metric-sub">収穫生重: <span id="cardHarvestKg">0</span> kg</div>
+      </div>
+    </div>
+
+    <!-- 🧪 液肥供給 vs 🥒 果実持ち出し 収支関係図 -->
+    <div class="balance-card">
+      <div class="balance-title">🔄 液肥供給量 vs 果実持ち出し量（養分収支バランス図）</div>
+      
+      <svg width="100%" height="135" viewBox="0 0 320 135">
+        <rect x="5" y="5" width="95" height="125" rx="6" fill="#f0fff4" stroke="#52c41a" stroke-width="1.5"/>
+        <rect x="220" y="5" width="95" height="125" rx="6" fill="#e6f7ff" stroke="#1890ff" stroke-width="1.5"/>
+
+        <text x="52" y="24" font-size="11" font-weight="bold" fill="#276749" text-anchor="middle">🧪 液肥給与成分</text>
+        <text x="52" y="42" font-size="9" fill="#52c41a" text-anchor="middle"><tspan id="balanceFertLabel">液肥名</tspan></text>
+        <line x1="15" y1="48" x2="90" y2="48" stroke="#d9f7be" stroke-width="1"/>
+        <text x="15" y="65" font-size="10" fill="#333">N : <tspan id="balSupplyN" font-weight="bold">0.00</tspan> kg</text>
+        <text x="15" y="83" font-size="10" fill="#333">P : <tspan id="balSupplyP" font-weight="bold">0.00</tspan> kg</text>
+        <text x="15" y="101" font-size="10" fill="#333">K : <tspan id="balSupplyK" font-weight="bold">0.00</tspan> kg</text>
+        <text x="52" y="120" font-size="9" fill="#52c41a" font-weight="bold" text-anchor="middle">給与計: <tspan id="balSupplyTotal">0.00</tspan>kg</text>
+
+        <path d="M 105 45 L 145 45 M 145 45 L 140 40 M 145 45 L 140 50" stroke="#28a745" stroke-width="3" stroke-linecap="round"/>
+        <path d="M 215 85 L 175 85 M 175 85 L 180 80 M 175 85 L 180 90" stroke="#1890ff" stroke-width="3" stroke-linecap="round"/>
+        
+        <rect x="110" y="55" width="100" height="28" rx="4" fill="#ffffff" stroke="#d9d9d9"/>
+        <text x="160" y="67" font-size="9" fill="#666" text-anchor="middle">株内蓄積・残存</text>
+        <text x="160" y="79" font-size="10" font-weight="bold" fill="#28a745" text-anchor="middle">N差引: <tspan id="balDiffN">+0.00</tspan>kg</text>
+
+        <text x="267" y="24" font-size="11" font-weight="bold" fill="#0050b3" text-anchor="middle">🥒 果実持ち出し</text>
+        <text x="267" y="42" font-size="9" fill="#1890ff" text-anchor="middle">収穫: <tspan id="balHarvestVal">0</tspan> kg</text>
+        <line x1="230" y1="48" x2="305" y2="48" stroke="#bae7ff" stroke-width="1"/>
+        <text x="230" y="65" font-size="10" fill="#333">N : <tspan id="balOutN" font-weight="bold">0.00</tspan> kg</text>
+        <text x="230" y="83" font-size="10" fill="#333">P : <tspan id="balOutP" font-weight="bold">0.00</tspan> kg</text>
+        <text x="230" y="101" font-size="10" fill="#333">K : <tspan id="balOutK" font-weight="bold">0.00</tspan> kg</text>
+        <text x="267" y="120" font-size="9" fill="#1890ff" font-weight="bold" text-anchor="middle">持ち出し計: <tspan id="balOutTotal">0.00</tspan>kg</text>
+      </svg>
+      <div style="font-size: 0.8em; color: #555; text-align: center; margin-top: 4px;">
+        💡 窒素(N)持ち出し率: <strong id="nExportRatio">0</strong>% （給与に対する果実消費の割合）
+      </div>
+    </div>
+
+    <!-- ☀️ 日射量・群落受光ビジュアルダイアグラム -->
+    <div class="solar-visual-card">
+      <div class="solar-visual-title">☀️ 日射受光・群落光吸収モデル図</div>
+      <svg width="100%" height="110" viewBox="0 0 300 110">
+        <circle cx="40" cy="35" r="18" fill="#ff9800"/>
+        <circle cx="40" cy="35" r="22" fill="#ffc107" opacity="0.3"/>
+        <line x1="62" y1="35" x2="110" y2="35" stroke="#ff9800" stroke-width="3" stroke-dasharray="4,2"/>
+        <line x1="58" y1="48" x2="110" y2="65" stroke="#ff9800" stroke-width="2" stroke-dasharray="4,2"/>
+        
+        <text x="40" y="75" font-size="10" text-anchor="middle" font-weight="bold" fill="#d48800">平均日射量</text>
+        <text x="40" y="90" font-size="11" text-anchor="middle" font-weight="bold" fill="#d48800"><tspan id="svgSolarVal">0.0</tspan> MJ/m²</text>
+
+        <g transform="translate(130, 20)">
+          <ellipse cx="40" cy="15" rx="35" ry="8" fill="#81c784" opacity="0.9"/>
+          <ellipse cx="40" cy="35" rx="38" ry="8" fill="#4caf50" opacity="0.9"/>
+          <ellipse cx="40" cy="55" rx="35" ry="8" fill="#2e7d32" opacity="0.9"/>
+          <line x1="40" y1="5" x2="40" y2="70" stroke="#388e3c" stroke-width="3"/>
+          <text x="40" y="85" font-size="10" text-anchor="middle" fill="#2e7d32" font-weight="bold">葉群 (LAI: <tspan id="svgLaiVal">0.0</tspan>)</text>
+        </g>
+
+        <path d="M 215 45 L 240 45" stroke="#28a745" stroke-width="3" fill="none"/>
+        <polygon points="240,40 250,45 240,50" fill="#28a745"/>
+
+        <text x="252" y="32" font-size="10" fill="#666">受光率: <tspan id="svgInterceptionPct" font-weight="bold" fill="#28a745">0</tspan>%</text>
+        <text x="252" y="52" font-size="11" font-weight="bold" fill="#28a745">吸収エネルギー</text>
+        <text x="252" y="68" font-size="12" font-weight="bold" fill="#1b5e20"><tspan id="svgAbsorbedSolar">0.00</tspan> MJ/m²</text>
+        <text x="252" y="85" font-size="9" fill="#888">⇒ 蒸散の駆動源</text>
+      </svg>
+    </div>
+
+    <!-- 施肥栄養成分バランスメーター -->
+    <div style="background:#fff; border:1px solid #e0e0e0; padding:15px; border-radius:8px; margin-bottom:15px;">
+      <div style="font-weight:bold; margin-bottom:10px; color:#2c3e50;">🌱 給液中の養成分バランス目安 (ハウス全体1回分)</div>
+      
+      <div class="bar-container">
+        <div class="bar-label">
+          <span>窒素 (N)</span>
+          <span><strong id="barNVal">0</strong> kg</span>
+        </div>
+        <div class="progress-bg"><div id="barN" class="progress-fill fill-n" style="width: 100%;"></div></div>
+      </div>
+
+      <div class="bar-container">
+        <div class="bar-label">
+          <span>リン酸 (P₂O₅)</span>
+          <span><strong id="barPVal">0</strong> kg</span>
+        </div>
+        <div class="progress-bg"><div id="barP" class="progress-fill fill-p" style="width: 27%;"></div></div>
+      </div>
+
+      <div class="bar-container">
+        <div class="bar-label">
+          <span>カリウム (K₂O)</span>
+          <span><strong id="barKVal">0</strong> kg</span>
+        </div>
+        <div class="progress-bg"><div id="barK" class="progress-fill fill-k" style="width: 133%;"></div></div>
+      </div>
+    </div>
+
+    <p><strong>適用環境・設備データ:</strong> 日射量 <span id="resSolar"></span> MJ/m² / 気温 <span id="resTemp"></span> °C (<span id="sourceTemp"></span>) / 湿度 <span id="resHum"></span> % / LAI <span id="resLAI"></span> / 総株数 <span id="resTotalPlants"></span> 株 / 設備流量 <span id="resFlowRate"></span> L/分</p>
 
     <!-- 根拠解説インフォメーション -->
     <div class="info-box">
       <h4>💡 計算式の根拠・モデル仕様</h4>
       <ul>
         <li><strong>受光量・蒸散計算（光の吸収モデル）:</strong><br>
-          キュウリ群落の葉が光を遮る割合（受光率）を「消光係数 0.7」と「LAI（葉面積指数）」から算出しています。<br>
-          <code>受光率 = 1 - (2.718 の -0.7 × LAI 乗)</code><br>
-          この受光率に日射量（MJ/m²）を掛け合わせた「作物受け取りエネルギー」に対し、基本蒸散効率として <strong>1 MJ あたり 0.35 L/m²</strong> の水を必要量として計算します。
+          消光係数 0.7 と LAI から群落受光率（<code>1 - e^(-0.7 × LAI)</code>）を求め、日射量（MJ/m²）と掛け合わせた受け取りエネルギーに対し、基本蒸散効率 <strong>1 MJ あたり 0.35 L/m²</strong> を基準に計算。
         </li>
-        <li><strong>気象補正（気温と湿度の影響）:</strong><br>
-          日平均気温が <strong>25 ℃</strong> を超える場合は、1 ℃ 上がるごとに <strong>2% 増量</strong> します。<br>
-          日平均湿度が <strong>50 %</strong> を下回る（空気が乾燥する）場合は、1 % 下がるごとに <strong>0.5% 増量</strong> して乾燥ストレスを補正します。
+        <li><strong>気象補正:</strong> 25℃超過時 1℃あたり <strong>2%増量</strong> / 湿度50%未満時 1%低下あたり <strong>0.5%増量</strong>。</li>
+        <li><strong>未来予報の積算:</strong> 選択された潅水周期（例: 3日分）の気象予報（日射量・気温）を取得し、1日ごとの蒸散量を積算して1回分の総水量を算出。</li>
+        <li><strong>設備稼働時間計算:</strong> 総潅水量 (L) ÷ 設備流量 (L/分) により必要吐出時間を算出。</li>
+        <li><strong>施肥・液肥換算:</strong> 標準窒素濃度 150ppm (0.15g/L) 基準。選択液肥のN保証成分量（ブラック:10%, グリーン:6%, OK-F-1:15%）から必要液肥量（L・kg）を算出。</li>
+        <li><strong>収穫物持ち出し量:</strong> 果実乾物率 <strong>4.0%</strong>、乾物中成分（N: 3.0%, P: 1.0%, K: 4.5%）で算出。</li>
+      </ul>
+    </div>
+
+    <!-- 学術的根拠ブロック -->
+    <div class="academic-box">
+      <h4>📘 本プログラムの学術・技術的根拠について</h4>
+      <p style="margin: 4px 0;">
+        本アプリの算出アルゴリズムは、植物生理学および施設園芸分野で確立された**既存の学術研究モデルおよび公的機関の栽培指針の数式をコード化して利用**しています。
+      </p>
+      <ul style="padding-left: 18px; margin: 8px 0 0 0; line-height: 1.6;">
+        <li>
+          <strong>受光量モデル:</strong> 
+          <a href="https://academic.oup.com/aob/article/95/3/483/322905" target="_blank" rel="noopener noreferrer">
+            モンシ・サエキの群落消光理論（Monsi & Saeki, 1953）
+          </a> に準拠。
         </li>
-        <li><strong>施肥濃度（窒素基準）:</strong><br>
-          養液土耕における標準的な施肥基準（目標窒素濃度 <strong>150 ppm = 0.15 g/L</strong>）を適用し、潅水量に応じた窒素・リン酸・カリの必要純成分量を算出しています。
+        <li>
+          <strong>蒸散・気象補正:</strong> 
+          <a href="https://www.professormendoncauenf.com.br/wp-content/uploads/2021/03/ag_fao_56_ingles.pdf" target="_blank" rel="noopener noreferrer">
+            FAO-56 基準蒸発散モデル（Penman-Monteith式）
+          </a> のパラメーター化ロジックを採用。
         </li>
-        <li><strong>液肥換算:</strong><br>
-          選択した液肥の窒素（N）保証成分量をもとに、目標窒素量を満たすために必要な液肥原液の量（Lおよびkg）を自動計算します（原液の比重は 1.2 g/mL として換算）。
+        <li>
+          <strong>施肥基準:</strong> 
+          <a href="https://www.naro.go.jp/" target="_blank" rel="noopener noreferrer">
+            農林水産省・農研機構（NARO）
+          </a> 等の「施設キュウリ養液土耕栽培マニュアル」に基づく標準養分濃度（N: 150ppm基準）を使用。
         </li>
       </ul>
     </div>
