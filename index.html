@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>キュウリ潅水・施肥計算アプリ (LAI対応)</title>
+  <title>キュウリ潅水・施肥計算アプリ (ハウス面積対応)</title>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 15px; line-height: 1.5; }
     .card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fafafa; }
@@ -13,6 +13,7 @@
     button:hover { background: #218838; }
     .result { background: #e9f7ef; border-left: 5px solid #28a745; padding: 15px; margin-top: 20px; }
     .note { font-size: 0.85em; color: #666; font-weight: normal; }
+    .highlight { font-weight: bold; color: #155724; }
   </style>
 </head>
 <body>
@@ -33,6 +34,10 @@
   <div class="card">
     <h3>2. 栽培パラメータ</h3>
     
+    <label>ハウス面積 (m²):
+      <input type="number" step="1" id="houseArea" value="1000" required>
+    </label>
+
     <label>株数 (本/m²):
       <input type="number" step="0.1" id="plantDensity" value="3.0" required>
     </label>
@@ -63,16 +68,30 @@
       <li>日射量: <span id="resSolar"></span> MJ/m²</li>
       <li>気温: <span id="resTemp"></span> °C (<span id="sourceTemp"></span>)</li>
       <li>湿度: <span id="resHum"></span> % (<span id="sourceHum"></span>)</li>
-      <li>遮光率調整後 LAI: <span id="resLAI"></span></li>
+      <li>LAI: <span id="resLAI"></span></li>
+      <li>総株数 (推定): <span id="resTotalPlants"></span> 株</li>
     </ul>
-    <p><strong>推奨管理量 (1日あたり):</strong></p>
+
+    <p><strong>【単位面積・1株あたり管理量 (1日)】</strong></p>
     <ul>
       <li><strong>必要潅水量:</strong> <span id="resWaterM2"></span> L/m² (<span id="resWaterPlant"></span> L/株)</li>
-      <li><strong>推定NPK施肥目安量 (1株あたり):</strong>
+      <li><strong>1株あたり施肥目安量:</strong>
         <ul>
           <li>窒素 (N): <span id="resN"></span> g/株</li>
           <li>リン酸 (P): <span id="resP"></span> g/株</li>
           <li>カリウム (K): <span id="resK"></span> g/株</li>
+        </ul>
+      </li>
+    </ul>
+
+    <p class="highlight"><strong>【ハウス全体での1日合計管理量】</strong></p>
+    <ul>
+      <li><strong>総潅水量:</strong> <span id="resTotalWaterL"></span> L (<span id="resTotalWaterTon"></span> m³/t)</li>
+      <li><strong>総施肥量:</strong>
+        <ul>
+          <li>窒素 (N): <span id="resTotalN"></span> kg</li>
+          <li>リン酸 (P): <span id="resTotalP"></span> kg</li>
+          <li>カリウム (K): <span id="resTotalK"></span> kg</li>
         </ul>
       </li>
     </ul>
