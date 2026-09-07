@@ -1,161 +1,107 @@
-import { loadEnv } from "./src/env_loader.js";
-import { calcCucumberLAI } from "./src/lai_cucumber.js";
-import { calcIrrigationFromEnv } from "./src/irrigation.js";
-import { calcNPK } from "./src/fertilization.js";
-
-// 折れ線グラフ
-function drawLineGraph(id, data, label) {
-  const width = document.getElementById(id).clientWidth;
-  const height = 200;
-  const svg = d3.select(`#${id}`).attr("width", width).attr("height", height);
-  svg.selectAll("*").remove();
-
-  const x = d3.scaleLinear().domain([0, data.length - 1]).range([30, width - 10]);
-  const y = d3.scaleLinear().domain([0, d3.max(data)]).range([height - 30, 10]);
-
-  const line = d3.line()
-    .x((d, i) => x(i))
-    .y(d => y(d));
-
-  svg.append("path")
-    .datum(data)
-    .attr("fill", "none")
-    .attr("stroke", "steelblue")
-    .attr("stroke-width", 2)
-    .attr("d", line);
-
-  svg.append("text")
-    .attr("x", 10)
-    .attr("y", 15)
-    .text(label)
-    .attr("font-size", "12px");
+function getCurrentLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        document.getElementById('lat').value = position.coords.latitude.toFixed(4);
+        document.getElementById('lon').value = position.coords.longitude.toFixed(4);
+        alert('現在地を取得しました');
+      },
+      (error) => {
+        alert('位置情報の取得に失敗しました: ' + error.message);
+      }
+    );
+  } else {
+    alert('お使いのブラウザは位置情報に対応していません');
+  }
 }
 
-// NPK複合グラフ
-function drawNPKGraph(id, Ndata, Pdata, Kdata) {
-  const width = document.getElementById(id).clientWidth;
-  const height = 240;
-  const svg = d3.select(`#${id}`).attr("width", width).attr("height", height);
-  svg.selectAll("*").remove();
+async function calculateWaterAndFertilizer() {
+  const lat = document.getElementById('lat').value;
+  const lon = document.getElementById('lon').value;
+  const plantDensity = parseFloat(document.getElementById('plantDensity').value);
+  const lai = parseFloat(document.getElementById('lai').value);
 
-  const x = d3.scaleLinear().domain([0, Ndata.length - 1]).range([30, width - 10]);
-  const maxY = Math.max(d3.max(Ndata), d3.max(Pdata), d3.max(Kdata));
-  const y = d3.scaleLinear().domain([0, maxY]).range([height - 30, 10]);
+  let inputTemp = document.getElementById('temperature').value;
+  let inputHum = document.getElementById('humidity').value;
 
-  const line = d3.line()
-    .x((d, i) => x(i))
-    .y(d => y(d));
+  if (!plantDensity || plantDensity <= 0) {
+    alert('株数（本/m²）を正しく入力してください');
+    return;
+  }
 
-  svg.append("path").datum(Ndata).attr("fill", "none").attr("stroke", "red").attr("stroke-width", 2).attr("d", line);
-  svg.append("path").datum(Pdata).attr("fill", "none").attr("stroke", "blue").attr("stroke-width", 2).attr("d", line);
-  svg.append("path").datum(Kdata).attr("fill", "none").attr("stroke", "green").attr("stroke-width", 2).attr("d", line);
+  if (!lai || lai <= 0) {
+    alert('LAI（葉面積指数）を正しく入力してください');
+    return;
+  }
 
-  svg.append("text").attr("x", 10).attr("y", 15).text("N（窒素）").attr("fill", "red");
-  svg.append("text").attr("x", 80).attr("y", 15).text("P（リン酸）").attr("fill", "blue");
-  svg.append("text").attr("x", 170).attr("y", 15).text("K（カリ）").attr("fill", "green");
+  try {
+    // Open-Meteo API呼び出し
+    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=shortwave_radiation_sum,temperature_2m_mean,relative_humidity_2m_mean&timezone=auto`;
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+
+    if (!data.daily) {
+      throw new Error('気象データの取得に失敗しました');
+    }
+
+    const solarRadiationSum = data.daily.shortwave_radiation_sum[0]; // MJ/m²
+    const fetchedTemp = data.daily.temperature_2m_mean[0];            // °C
+    const fetchedHum = data.daily.relative_humidity_2m_mean[0];             // %
+
+    const finalTemp = inputTemp !== "" ? parseFloat(inputTemp) : fetchedTemp;
+    const sourceTemp = inputTemp !== "" ? "手動指定" : "Open-Meteo取得";
+
+    const finalHum = inputHum !== "" ? parseFloat(inputHum) : fetchedHum;
+    const sourceHum = inputHum !== "" ? "手動指定" : "Open-Meteo取得";
+
+    // --- 【LAIを組込んだ計算ロジック】 ---
+    
+    // 1. 光の吸光モデル (Beer-Lambertの法則) による群体受光係数
+    // 消光係数 (k) はキュウリでおおむね 0.7 程度
+    const k = 0.7;
+    const lightInterceptionFraction = 1 - Math.exp(-k * lai); // 作物群落による日射受光率 (0〜1)
+
+    // 受光量に応じた基本蒸散量（日射エネルギーからの水蒸発効率: 約 0.35 L / MJ）
+    let baseWaterPerM2 = solarRadiationSum * lightInterceptionFraction * 0.35;
+
+    // 2. 気温・湿度（VPD補正）
+    if (finalTemp > 25) {
+      baseWaterPerM2 *= (1 + (finalTemp - 25) * 0.02);
+    }
+    if (finalHum < 50) {
+      baseWaterPerM2 *= (1 + (50 - finalHum) * 0.005);
+    }
+
+    // 株あたりの潅水量
+    const waterPerPlant = baseWaterPerM2 / plantDensity;
+
+    // 3. NPK施肥量計算（灌水中の養分濃度規定: N 150ppm, P2O5 40ppm, K2O 200ppm 想定）
+    const nRatio = 0.15; // g/L
+    const pRatio = 0.04; // g/L
+    const kRatio = 0.20; // g/L
+
+    const nPerPlant = waterPerPlant * nRatio;
+    const pPerPlant = waterPerPlant * pRatio;
+    const kPerPlant = waterPerPlant * kRatio;
+
+    // --- 画面描画 ---
+    document.getElementById('resSolar').innerText = solarRadiationSum.toFixed(2);
+    document.getElementById('resTemp').innerText = finalTemp.toFixed(1);
+    document.getElementById('sourceTemp').innerText = sourceTemp;
+    document.getElementById('resHum').innerText = finalHum.toFixed(1);
+    document.getElementById('sourceHum').innerText = sourceHum;
+    document.getElementById('resLAI').innerText = lai.toFixed(1);
+
+    document.getElementById('resWaterM2').innerText = baseWaterPerM2.toFixed(2);
+    document.getElementById('resWaterPlant').innerText = waterPerPlant.toFixed(2);
+
+    document.getElementById('resN').innerText = nPerPlant.toFixed(2);
+    document.getElementById('resP').innerText = pPerPlant.toFixed(2);
+    document.getElementById('resK').innerText = kPerPlant.toFixed(2);
+
+    document.getElementById('output').style.display = 'block';
+
+  } catch (err) {
+    alert('エラーが発生しました: ' + err.message);
+  }
 }
-
-// 収量予測グラフ
-function drawYieldGraph(id, data, label) {
-  const width = document.getElementById(id).clientWidth;
-  const height = 200;
-  const svg = d3.select(`#${id}`).attr("width", width).attr("height", height);
-  svg.selectAll("*").remove();
-
-  const x = d3.scaleLinear().domain([0, data.length - 1]).range([30, width - 10]);
-  const y = d3.scaleLinear().domain([0, d3.max(data)]).range([height - 30, 10]);
-
-  const line = d3.line()
-    .x((d, i) => x(i))
-    .y(d => y(d));
-
-  svg.append("path")
-    .datum(data)
-    .attr("fill", "none")
-    .attr("stroke", "purple")
-    .attr("stroke-width", 2)
-    .attr("d", line);
-
-  svg.append("text")
-    .attr("x", 10)
-    .attr("y", 15)
-    .text(label)
-    .attr("font-size", "12px");
-}
-
-// NPKテーブル更新
-function updateNPKTable(N, P, K) {
-  const tbody = document.querySelector("#npkTable tbody");
-  tbody.innerHTML = `
-    <tr>
-      <td>${N.toFixed(2)}</td>
-      <td>${P.toFixed(2)}</td>
-      <td>${K.toFixed(2)}</td>
-    </tr>
-  `;
-}
-
-document.getElementById("calcGraph").onclick = async () => {
-
-  const crop = document.getElementById("crop").value;
-
-  const cropFactor = {
-    cucumber: 1.0,
-    tomato: 0.85,
-    pepper: 0.75,
-    strawberry: 0.55
-  }[crop];
-
-  const env = await loadEnv();
-  const leafAges = [10, 15, 20, 25];
-  const LAI = calcCucumberLAI(leafAges);
-
-  const temp = parseFloat(document.getElementById("temp").value) || null;
-  const rh = parseFloat(document.getElementById("rh").value) || null;
-  const plant_density = parseFloat(document.getElementById("density").value);
-  const ground_area = parseFloat(document.getElementById("area").value);
-
-  const result = calcIrrigationFromEnv(LAI, env, {
-    temp,
-    rh,
-    plant_density,
-    ground_area,
-    leaching: 1.1,
-    crop_factor: cropFactor
-  });
-
-  const fert = calcNPK(result.ET, crop);
-
-  const sw = env.shortwave.slice(0, 24);
-  const tArr = env.temp.slice(0, 24);
-  const irrArr = Array(24).fill(result.irrigation_per_plant);
-  const Ndata = Array(24).fill(fert.N);
-  const Pdata = Array(24).fill(fert.P);
-  const Kdata = Array(24).fill(fert.K);
-  const yieldData = Array(24).fill(fert.Y);
-
-  drawLineGraph("graphSW", sw, "短波放射 (W/m2)");
-  drawLineGraph("graphT", tArr, "気温 (℃)");
-  drawLineGraph("graphIrr", irrArr, "潅水量 (L/株/day)");
-  drawNPKGraph("graphNPK", Ndata, Pdata, Kdata);
-  drawYieldGraph("graphYield", yieldData, "収量予測 (kg/株/day)");
-  updateNPKTable(fert.N, fert.P, fert.K);
-
-  document.getElementById("output").textContent =
-    `作物: ${crop}
-LAI: ${LAI.toFixed(2)}
-DLI: ${result.DLI.toFixed(1)} mol/m2/day
-気温: ${result.T.toFixed(1)} ℃
-湿度: ${result.RH.toFixed(1)} %
-VPD: ${result.VPD.toFixed(2)} kPa
-ET: ${result.ET.toFixed(2)} L/m2/day
-潅水量: ${result.irrigation_per_plant.toFixed(2)} L/株/day
-
---- 収量予測モデル ---
-収量推定: ${fert.Y.toFixed(2)} kg/株/day
-
---- 収量比例施肥 ---
-N: ${fert.N.toFixed(2)} g/株/day
-P: ${fert.P.toFixed(2)} g/株/day
-K: ${fert.K.toFixed(2)} g/株/day`;
-};
