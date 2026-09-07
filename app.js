@@ -1,7 +1,8 @@
-import { loadEnv } from "../src/env_loader.js";
-import { calcCucumberLAI } from "../src/lai_cucumber.js";
-import { calcIrrigationFromEnv } from "../src/irrigation.js";
-import { calcNPK } from "../src/fertilization.js";
+import { loadEnv } from "./src/env_loader.js";
+import { calcCucumberLAI } from "./src/lai_cucumber.js";
+import { calcIrrigationFromEnv } from "./src/irrigation.js";
+import { calcNPK } from "./src/fertilization.js";
+
 
 // 単純な折れ線グラフ描画
 function drawLineGraph(id, data, label) {
