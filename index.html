@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>キュウリ潅水・施肥計算アプリ</title>
-  <!-- html2canvasライブラリ（PNG画像キャプチャ用） -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 680px; margin: 20px auto; padding: 15px; line-height: 1.5; color: #333; background-color: #f4f7f6; }
@@ -15,25 +14,17 @@
     input[readonly] { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
     button { background: #28a745; color: white; border: none; padding: 14px; width: 100%; border-radius: 6px; font-size: 17px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: background 0.2s; }
     button:hover { background: #218838; }
-    
     .btn-secondary { background: #6c757d; margin-top: 5px; }
     .btn-secondary:hover { background: #5a6268; }
-
     .btn-png { background: #17a2b8; margin-top: 0; padding: 8px 16px; width: auto; font-size: 14px; }
     .btn-png:hover { background: #138496; }
-
     .json-flex { display: flex; gap: 10px; flex-wrap: wrap; }
     .json-flex > div { flex: 1; min-width: 200px; }
-
     .result { background: #ffffff; border: 1px solid #28a745; border-radius: 10px; padding: 20px; margin-top: 20px; box-shadow: 0 4px 12px rgba(40,167,69,0.15); }
     .note { font-size: 0.85em; color: #666; font-weight: normal; }
-
-    /* サマリーヘッダー用レスポンシブ配置 */
     .summary-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 15px; }
     .summary-title-area { flex: 1; min-width: 240px; }
     .summary-period-badge { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; border-radius: 6px; padding: 6px 12px; font-size: 0.9em; font-weight: bold; margin-top: 6px; display: inline-block; }
-
-    /* --- 視覚化コンポーネント用スタイル --- */
     .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 15px 0; }
     .metric-card { background: #f8f9fa; border-radius: 8px; padding: 12px; border-left: 4px solid #28a745; text-align: center; }
     .metric-card.transpiration { border-left-color: #00bcd4; background: #e0f7fa; }
@@ -44,22 +35,14 @@
     .metric-value { font-size: 1.4em; font-weight: bold; margin: 4px 0; color: #212529; }
     .metric-sub { font-size: 0.78em; color: #6c757d; }
     .metric-sub.highlight { color: #0056b3; font-weight: bold; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #b8daff; }
-
-    /* 養分バランス関係図用スタイル */
     .balance-card { background: #f4fbf7; border: 1px solid #b7eb8f; border-radius: 8px; padding: 15px; margin: 15px 0; }
     .balance-title { font-weight: bold; color: #276749; font-size: 0.95em; margin-bottom: 8px; text-align: center; }
-
-    /* ☀️ 蒸散ビジュアルカード */
     .solar-visual-card { background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px; padding: 15px; margin: 15px 0; }
     .solar-visual-title { font-weight: bold; color: #d48800; font-size: 0.95em; margin-bottom: 8px; text-anchor: middle; text-align: center; }
-
-    /* テーブル表示スタイル */
     .data-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.88em; background: #fff; border-radius: 6px; overflow: hidden; border: 1px solid #dee2e6; }
     .data-table th { background-color: #e9ecef; color: #495057; text-align: left; padding: 8px 12px; font-weight: bold; border-bottom: 2px solid #dee2e6; width: 45%; }
     .data-table td { padding: 8px 12px; border-bottom: 1px solid #dee2e6; color: #212529; }
     .data-table tr:last-child td { border-bottom: none; }
-
-    /* プログレスバー */
     .bar-container { margin: 8px 0; }
     .bar-label { display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 3px; font-weight: bold; }
     .progress-bg { background: #e9ecef; border-radius: 10px; height: 12px; overflow: hidden; }
@@ -67,22 +50,18 @@
     .fill-n { background: #28a745; }
     .fill-p { background: #17a2b8; }
     .fill-k { background: #fd7e14; }
-
     .info-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-top: 20px; font-size: 0.88em; }
     .info-box h4 { margin-top: 0; color: #495057; border-bottom: 2px solid #28a745; padding-bottom: 5px; }
     .info-box ul { padding-left: 20px; margin-bottom: 0; }
-
     .academic-box { background: #eef6fc; border: 1px solid #b8daff; border-radius: 6px; padding: 15px; margin-top: 15px; font-size: 0.85em; color: #004085; }
     .academic-box h4 { margin: 0 0 8px 0; color: #0056b3; display: flex; align-items: center; gap: 5px; }
     .academic-box a { color: #0056b3; text-decoration: underline; font-weight: bold; }
-    .academic-box a:hover { color: #002752; }
   </style>
 </head>
 <body>
 
   <h2>🥒 キュウリ 潅水・施肥量計算機</h2>
 
-  <!-- JSON保存・読み込みエリア -->
   <div class="card" style="background: #eef9f1; border-color: #c3e6cb;">
     <h3 style="margin-top:0; color: #155724;">💾 設定パラメータの入出力 (JSON)</h3>
     <div class="json-flex">
@@ -110,23 +89,18 @@
 
   <div class="card">
     <h3>2. 栽培パラメータ</h3>
-    
     <label>ハウス面積 (m²):
       <input type="number" step="1" id="houseArea" value="1000" oninput="updatePlantDensity()" onchange="updatePlantDensity()" required>
     </label>
-
     <label>総株数 (本):
       <input type="number" step="1" id="totalPlantsInput" value="3000" oninput="updatePlantDensity()" onchange="updatePlantDensity()" required>
     </label>
-
     <label>株数密度 (本/m²) <span class="note">※自動計算</span>:
       <input type="number" id="plantDensity" value="3.00" readonly>
     </label>
-
-    <label>設備潅水量 (L/分) <span class="note">※1分間にハウス全体へ給水される流量</span>:
+    <label>設備潅水量 (L/分):
       <input type="number" step="0.1" id="flowRate" value="50.0" required>
     </label>
-
     <label>潅水周期 (日):
       <select id="intervalDays">
         <option value="1">1日ごと (毎日)</option>
@@ -137,11 +111,9 @@
         <option value="7">7日ごと</option>
       </select>
     </label>
-
-    <label>LAI (葉面積指数 m²/m²) <span class="note">※育苗期: 0.5〜1.0 / 収穫期: 3.0〜4.5</span>:
+    <label>LAI (葉面積指数 m²/m²):
       <input type="number" step="0.1" id="lai" value="3.5" required>
     </label>
-
     <label>使用液肥銘柄:
       <select id="fertilizerType">
         <option value="black">トミー液肥ブラック (N:10% - P:4% - K:6%)</option>
@@ -149,27 +121,19 @@
         <option value="okf1">OK-F-1 (N:15% - P:8% - K:17%)</option>
       </select>
     </label>
-
-    <label>期間内のハウス全体の予定収穫量 (kg) <span class="note">※任意入力</span>:
+    <label>期間内のハウス全体の予定収穫量 (kg):
       <input type="number" step="0.1" id="harvestKg" value="150" placeholder="例: 150">
     </label>
   </div>
 
   <div class="card">
     <h3>3. 気象パラメータ (1日あたり手動指定時の設定)</h3>
-
-    <label>直達短波放射 (MJ/m²/日) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
-      <input type="number" step="0.1" id="manualDirectRad" placeholder="自動取得 (例: 9.0)">
+    <label>短波放射 (MJ/m²/日) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
+      <input type="number" step="0.1" id="manualSolarRad" placeholder="自動取得 (例: 15.0)">
     </label>
-
-    <label>散乱短波放射 (MJ/m²/日) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
-      <input type="number" step="0.1" id="manualDiffuseRad" placeholder="自動取得 (例: 6.0)">
-    </label>
-
     <label>平均気温 (°C) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
       <input type="number" step="0.1" id="temperature" placeholder="自動取得">
     </label>
-
     <label>平均湿度 (%) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
       <input type="number" step="0.1" id="humidity" placeholder="自動取得">
     </label>
@@ -178,12 +142,11 @@
   <button type="button" onclick="calculateWaterAndFertilizer()">🚀 計算実行</button>
 
   <div id="output" class="result" style="display:none;">
-    <!-- ヘッダーエリア -->
     <div class="summary-header">
       <div class="summary-title-area">
         <h3 style="margin:0; color:#2c3e50;">📊 計算・管理ビジュアルサマリー</h3>
         <div class="summary-period-badge">
-          📅 計算対象: <span id="summaryPeriodDates">----/--/-- 〜 ----/--/--</span> (<span id="summaryPeriodDays">0</span>日分の施肥潅水量)
+          📅 計算対象: <span id="summaryPeriodDates">----/--/-- 〜 ----/--/--</span> (<span id="summaryPeriodDays">0</span>日分)
         </div>
       </div>
       <div>
@@ -191,7 +154,6 @@
       </div>
     </div>
 
-    <!-- 主要指標ハイライトカード -->
     <div class="metric-grid">
       <div class="metric-card transpiration">
         <div class="metric-title">🍃 推定総蒸散量</div>
@@ -221,29 +183,19 @@
       </div>
     </div>
 
-    <!-- ☀️ 日射量（Rs）・直達/散乱分離PAR・群落光吸収 ＆ 蒸散メカニズムSVG図 -->
     <div class="solar-visual-card">
-      <div class="solar-visual-title">☀️ 日射受光（直達・散乱分離PARモデル）・群落光吸収図</div>
-      <svg width="100%" height="160" viewBox="0 0 320 160">
-        <!-- 太陽イラスト -->
+      <div class="solar-visual-title">☀️ 日射受光（PARモデル）・群落光吸収図</div>
+      <svg width="100%" height="150" viewBox="0 0 320 150">
         <circle cx="35" cy="30" r="16" fill="#ff9800"/>
         <circle cx="35" cy="30" r="20" fill="#ffc107" opacity="0.3"/>
-        <line x1="55" y1="20" x2="100" y2="20" stroke="#f57c00" stroke-width="2.5" stroke-dasharray="3,2"/>
-        <line x1="55" y1="45" x2="100" y2="55" stroke="#ffb74d" stroke-width="2" stroke-dasharray="3,2"/>
-        
-        <!-- 太陽・放射指標テキスト -->
+        <line x1="55" y1="30" x2="100" y2="30" stroke="#f57c00" stroke-width="2.5" stroke-dasharray="3,2"/>
         <text x="35" y="60" font-size="8" text-anchor="middle" font-weight="bold" fill="#d48800">全天日射 (Rs)</text>
         <text x="35" y="72" font-size="9" text-anchor="middle" font-weight="bold" fill="#d48800"><tspan id="svgSolarVal">0.0</tspan> MJ/m²</text>
         
-        <text x="35" y="86" font-size="8" text-anchor="middle" font-weight="bold" fill="#2e7d32">直達PAR (×0.43)</text>
-        <text x="35" y="97" font-size="8.5" text-anchor="middle" fill="#2e7d32"><tspan id="svgParDirect">0.0</tspan> MJ/m²</text>
-        
-        <text x="35" y="111" font-size="8" text-anchor="middle" font-weight="bold" fill="#2e7d32">散乱PAR (×0.57)</text>
-        <text x="35" y="122" font-size="8.5" text-anchor="middle" fill="#2e7d32"><tspan id="svgParDiffuse">0.0</tspan> MJ/m²</text>
+        <text x="35" y="90" font-size="8" text-anchor="middle" font-weight="bold" fill="#2e7d32">PAR (光合成有効放射)</text>
+        <text x="35" y="102" font-size="9" text-anchor="middle" fill="#2e7d32"><tspan id="svgParVal">0.0</tspan> MJ/m²</text>
 
-        <!-- 葉群（群落消光モデル） -->
-        <g transform="translate(112, 28)">
-          <!-- 蒸散蒸気（青い点線矢印） -->
+        <g transform="translate(112, 25)">
           <path d="M 25 10 Q 20 -5 25 -15" stroke="#00bcd4" stroke-width="2" fill="none" stroke-dasharray="2,2"/>
           <path d="M 40 10 Q 45 -5 40 -15" stroke="#00bcd4" stroke-width="2" fill="none" stroke-dasharray="2,2"/>
           <text x="32" y="-18" font-size="9" text-anchor="middle" font-weight="bold" fill="#00838f">🍃 蒸散作用</text>
@@ -256,31 +208,26 @@
           <text x="32" y="94" font-size="8" text-anchor="middle" fill="#555">受光率: <tspan id="svgAbsorbedRatio">0</tspan>%</text>
         </g>
 
-        <!-- 変換矢印 -->
         <path d="M 188 60 L 213 60" stroke="#00bcd4" stroke-width="2.5" fill="none"/>
         <polygon points="213,56 221,60 213,64" fill="#00bcd4"/>
 
-        <!-- 蒸散結果出力カード -->
-        <rect x="223" y="15" width="92" height="132" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+        <rect x="223" y="15" width="92" height="120" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
         <text x="269" y="32" font-size="10" font-weight="bold" fill="#006064" text-anchor="middle">🍃 群落蒸散量</text>
         <line x1="229" y1="38" x2="309" y2="38" stroke="#b2ebf2" stroke-width="1"/>
-        <text x="269" y="54" font-size="13" font-weight="bold" fill="#00838f" text-anchor="middle"><tspan id="svgTranspirationM2">0.00</tspan> L/m²</text>
-        <text x="269" y="68" font-size="8.5" fill="#555" text-anchor="middle">(ハウス: <tspan id="svgTranspirationTotal" font-weight="bold">0</tspan> L)</text>
-        <line x1="229" y1="76" x2="309" y2="76" stroke="#b2ebf2" stroke-width="1"/>
-        <text x="269" y="90" font-size="8.5" fill="#006064" text-anchor="middle">合計PAR / 吸収PAR:</text>
-        <text x="269" y="103" font-size="9" font-weight="bold" fill="#2e7d32" text-anchor="middle"><tspan id="svgParVal">0.0</tspan> / <tspan id="svgAbsorbedPar">0.0</tspan> MJ</text>
-        <text x="269" y="128" font-size="9" font-weight="bold" fill="#006064" text-anchor="middle"><tspan id="svgTranspirationPlant">0.00</tspan> L/株</text>
+        <text x="269" y="55" font-size="13" font-weight="bold" fill="#00838f" text-anchor="middle"><tspan id="svgTranspirationM2">0.00</tspan> L/m²</text>
+        <text x="269" y="70" font-size="8.5" fill="#555" text-anchor="middle">(ハウス: <tspan id="svgTranspirationTotal" font-weight="bold">0</tspan> L)</text>
+        <line x1="229" y1="78" x2="309" y2="78" stroke="#b2ebf2" stroke-width="1"/>
+        <text x="269" y="93" font-size="8.5" fill="#006064" text-anchor="middle">吸収PAR:</text>
+        <text x="269" y="106" font-size="9" font-weight="bold" fill="#2e7d32" text-anchor="middle"><tspan id="svgAbsorbedPar">0.0</tspan> MJ</text>
+        <text x="269" y="125" font-size="9" font-weight="bold" fill="#006064" text-anchor="middle"><tspan id="svgTranspirationPlant">0.00</tspan> L/株</text>
       </svg>
     </div>
 
-    <!-- 🧪 液肥供給 vs 🥒 果実持ち出し 収支関係図 -->
     <div class="balance-card">
       <div class="balance-title">🔄 液肥供給量 vs 果実持ち出し量（養分収支バランス図）</div>
-      
       <svg width="100%" height="135" viewBox="0 0 320 135">
         <rect x="5" y="5" width="95" height="125" rx="6" fill="#f0fff4" stroke="#52c41a" stroke-width="1.5"/>
         <rect x="220" y="5" width="95" height="125" rx="6" fill="#e6f7ff" stroke="#1890ff" stroke-width="1.5"/>
-
         <text x="52" y="24" font-size="11" font-weight="bold" fill="#276749" text-anchor="middle">🧪 液肥給与成分</text>
         <text x="52" y="42" font-size="9" fill="#52c41a" text-anchor="middle"><tspan id="balanceFertLabel">液肥名</tspan></text>
         <line x1="15" y1="48" x2="90" y2="48" stroke="#d9f7be" stroke-width="1"/>
@@ -305,124 +252,53 @@
         <text x="267" y="120" font-size="9" fill="#1890ff" font-weight="bold" text-anchor="middle">持ち出し計: <tspan id="balOutTotal">0.00</tspan>kg</text>
       </svg>
       <div style="font-size: 0.8em; color: #555; text-align: center; margin-top: 4px;">
-        💡 窒素(N)持ち出し率: <strong id="nExportRatio">0</strong>% （給与に対する果実消費の割合）
+        💡 窒素(N)持ち出し率: <strong id="nExportRatio">0</strong>%
       </div>
     </div>
 
-    <!-- 施肥栄養成分バランスメーター -->
     <div style="background:#fff; border:1px solid #e0e0e0; padding:15px; border-radius:8px; margin-bottom:15px;">
       <div style="font-weight:bold; margin-bottom:10px; color:#2c3e50;">🌱 給液中の養成分バランス目安 (ハウス全体1回分)</div>
-      
       <div class="bar-container">
-        <div class="bar-label">
-          <span>窒素 (N)</span>
-          <span><strong id="barNVal">0</strong> kg</span>
-        </div>
+        <div class="bar-label"><span>窒素 (N)</span><span><strong id="barNVal">0</strong> kg</span></div>
         <div class="progress-bg"><div id="barN" class="progress-fill fill-n" style="width: 100%;"></div></div>
       </div>
-
       <div class="bar-container">
-        <div class="bar-label">
-          <span>リン酸 (P₂O₅)</span>
-          <span><strong id="barPVal">0</strong> kg</span>
-        </div>
+        <div class="bar-label"><span>リン酸 (P₂O₅)</span><span><strong id="barPVal">0</strong> kg</span></div>
         <div class="progress-bg"><div id="barP" class="progress-fill fill-p" style="width: 27%;"></div></div>
       </div>
-
       <div class="bar-container">
-        <div class="bar-label">
-          <span>カリウム (K₂O)</span>
-          <span><strong id="barKVal">0</strong> kg</span>
-        </div>
+        <div class="bar-label"><span>カリウム (K₂O)</span><span><strong id="barKVal">0</strong> kg</span></div>
         <div class="progress-bg"><div id="barK" class="progress-fill fill-k" style="width: 133%;"></div></div>
       </div>
     </div>
 
-    <!-- 📋 適用環境・設備データ テーブル構造 -->
     <div style="margin-bottom: 15px;">
       <div style="font-weight: bold; color: #2c3e50; margin-bottom: 6px;">📋 適用環境・設備データ一覧</div>
       <table class="data-table">
         <tbody>
-          <tr>
-            <th>短波放射 (Rs / 直達・散乱)</th>
-            <td>直達 <span id="resDirectRs">0.0</span> + 散乱 <span id="resDiffuseRs">0.0</span> = 合計 <span id="resSolar">0.0</span> MJ/m²/日</td>
-          </tr>
-          <tr>
-            <th>PAR (光合成有効放射)</th>
-            <td>直達 <span id="resParDirect">0.0</span> + 散乱 <span id="resParDiffuse">0.0</span> = 合計 <span id="resPAR">0.0</span> MJ/m²/日</td>
-          </tr>
-          <tr>
-            <th>期間積算PAR / 吸収PAR</th>
-            <td>積算PAR <span id="resPARTotal">0.0</span> MJ/m² (吸収PAR <span id="resAbsorbedParTotal">0.0</span> MJ/m²)</td>
-          </tr>
-          <tr>
-            <th>平均気温 / 湿度</th>
-            <td><span id="resTemp">0.0</span> °C (<span id="sourceTemp">--</span>) / <span id="resHum">0.0</span> %</td>
-          </tr>
-          <tr>
-            <th>葉面積指数 (LAI) / 群落受光率</th>
-            <td>LAI <span id="resLAI">0.0</span> (<span id="resAbsorbedRatio">0</span>% 受光)</td>
-          </tr>
-          <tr>
-            <th>ハウス構造 / 栽培規模</th>
-            <td>面積 <span id="resArea">0</span> m² / 総株数 <span id="resTotalPlants">0</span> 株 (<span id="resDensity">0.0</span> 本/m²)</td>
-          </tr>
-          <tr>
-            <th>設備潅水能力</th>
-            <td><span id="resFlowRate">0.0</span> L/分</td>
-          </tr>
+          <tr><th>短波放射 (Rs / GHI)</th><td><span id="resSolar">0.0</span> MJ/m²/日</td></tr>
+          <tr><th>PAR (光合成有効放射)</th><td><span id="resPAR">0.0</span> MJ/m²/日</td></tr>
+          <tr><th>期間積算PAR / 吸収PAR</th><td>積算PAR <span id="resPARTotal">0.0</span> MJ/m² (吸収PAR <span id="resAbsorbedParTotal">0.0</span> MJ/m²)</td></tr>
+          <tr><th>平均気温 / 湿度</th><td><span id="resTemp">0.0</span> °C (<span id="sourceTemp">--</span>) / <span id="resHum">0.0</span> %</td></tr>
+          <tr><th>葉面積指数 (LAI) / 群落受光率</th><td>LAI <span id="resLAI">0.0</span> (<span id="resAbsorbedRatio">0</span>% 受光)</td></tr>
+          <tr><th>ハウス構造 / 栽培規模</th><td>面積 <span id="resArea">0</span> m² / 総株数 <span id="resTotalPlants">0</span> 株 (<span id="resDensity">0.0</span> 本/m²)</td></tr>
+          <tr><th>設備潅水能力</th><td><span id="resFlowRate">0.0</span> L/分</td></tr>
         </tbody>
       </table>
     </div>
 
-    <!-- 根拠解説インフォメーション -->
     <div class="info-box">
       <h4>💡 計算式の根拠・モデル仕様</h4>
       <ul>
-        <li><strong>直達光・散乱光分離PAR算定モデル:</strong><br>
-          短波放射量（Rs）を直達光と散乱光に分離し、それぞれの分光特性に基づき <code>直達光 × 0.43 ＋ 散乱光 × 0.57</code> としてPAR（光合成有効放射波長 400〜700nm）を算定しています。
-        </li>
-        <li><strong>受光量・蒸散計算（光の吸収モデル）:</strong><br>
-          消光係数 0.7 と LAI から群落受光率（<code>1 - e^(-0.7 × LAI)</code>）を求め、吸収短波放射エネルギーに対し、基本蒸散効率 <strong>1 MJ あたり 0.35 L/m²</strong> を基準に計算。
-        </li>
+        <li><strong>PAR算定モデル:</strong> 短波放射量（Rs）から光合成有効放射（PAR）を算出（分離モデルまたは換算係数適用）。</li>
+        <li><strong>受光量・蒸散計算:</strong> 消光係数 0.7 と LAI から群落受光率を求め、吸収短波放射エネルギーに対し基本蒸散効率 <strong>1 MJ あたり 0.35 L/m²</strong> を基準に計算。</li>
         <li><strong>気象補正:</strong> 25℃超過時 1℃あたり <strong>2%増量</strong> / 湿度50%未満時 1%低下あたり <strong>0.5%増量</strong>。</li>
-        <li><strong>未来予報の積算:</strong> 選択された潅水周期（例: 3日分）の気象予報を取得し、1日ごとの蒸散量を積算して1回分の総水量を算出。</li>
-        <li><strong>設備稼働時間計算:</strong> 総潅水量 (L) ÷ 設備流量 (L/分) により必要吐出時間を算出。</li>
-        <li><strong>施肥・液肥換算:</strong> 標準窒素濃度 150ppm (0.15g/L) 基準。選択液肥のN保証成分量から必要液肥量（L・kg）を算出。</li>
-        <li><strong>収穫物持ち出し量:</strong> 果実乾物率 <strong>4.0%</strong>、乾物中成分（N: 3.0%, P: 1.0%, K: 4.5%）で算出。</li>
       </ul>
     </div>
 
-    <!-- 学術的根拠ブロック -->
     <div class="academic-box">
       <h4>📘 本プログラムの学術・技術的根拠について</h4>
-      <p style="margin: 4px 0;">
-        本アプリの算出アルゴリズムは、植物生理学および施設園芸分野で確立された**既存の学術研究モデルおよび公的機関の栽培指針の数式をコード化して利用**しています。
-      </p>
-      <ul style="padding-left: 18px; margin: 8px 0 0 0; line-height: 1.6;">
-        <li>
-          <strong>PAR・大気透過モデル:</strong> 
-          太陽放射の分光組成特性（直達波長: 43%、散乱波長: 57%）に基づき光合成有効放射を分離計算。
-        </li>
-        <li>
-          <strong>受光量モデル:</strong> 
-          <a href="https://academic.oup.com/aob/article/95/3/483/322905" target="_blank" rel="noopener noreferrer">
-            モンシ・サエキの群落消光理論（Monsi & Saeki, 1953）
-          </a> に準拠。
-        </li>
-        <li>
-          <strong>蒸散・気象補正:</strong> 
-          <a href="https://www.professormendoncauenf.com.br/wp-content/uploads/2021/03/ag_fao_56_ingles.pdf" target="_blank" rel="noopener noreferrer">
-            FAO-56 基準蒸発散モデル（Penman-Monteith式）
-          </a> のパラメーター化ロジックを採用。
-        </li>
-        <li>
-          <strong>施肥基準:</strong> 
-          <a href="https://www.naro.go.jp/" target="_blank" rel="noopener noreferrer">
-            農林水産省・農研機構（NARO）
-          </a> 等の「施設キュウリ養液土耕栽培マニュアル」に基づく標準養分濃度（N: 150ppm基準）を使用。
-        </li>
-      </ul>
+      <p style="margin: 4px 0;">本アプリは**モンシ・サエキの群落消光理論（Monsi & Saeki, 1953）**および**FAO-56 基準蒸発散モデル**に準拠しています。</p>
     </div>
   </div>
 
