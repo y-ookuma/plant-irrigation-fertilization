@@ -42,11 +42,22 @@ function exportParamsJSON() {
     temperature: document.getElementById('temperature').value,
     humidity: document.getElementById('humidity').value
   };
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(params, null, 2));
+
+  // スマホ対応として Blob オブジェクトを使用
+  const jsonString = JSON.stringify(params, null, 2);
+  const blob = new Blob([jsonString], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
   const dlAnchorElem = document.createElement('a');
-  dlAnchorElem.setAttribute("href", dataStr);
+  dlAnchorElem.setAttribute("href", url);
   dlAnchorElem.setAttribute("download", "cucumber_params.json");
+  document.body.appendChild(dlAnchorElem);
   dlAnchorElem.click();
+  
+  setTimeout(() => {
+    document.body.removeChild(dlAnchorElem);
+    URL.revokeObjectURL(url);
+  }, 1000);
 }
 
 function importParamsJSON(event) {
@@ -86,14 +97,11 @@ async function calculateWaterAndFertilizer() {
   const manualTemp = parseFloat(document.getElementById('temperature').value);
   const manualHum = parseFloat(document.getElementById('humidity').value);
 
-  // 期間日付の算出：
-  // 1日ごとの場合は当日（今日）、2日以上の場合は本日から未来へ向けた予測期間とする
   const startDate = new Date();
   const endDate = new Date();
   if (intervalDays > 1) {
     endDate.setDate(startDate.getDate() + (intervalDays - 1));
   } else {
-    // 1日の場合は同日
     endDate.setTime(startDate.getTime());
   }
 
@@ -114,14 +122,12 @@ async function calculateWaterAndFertilizer() {
   let dataSource = "手動入力値";
   let dateList = [];
 
-  // 日付の配列作成
   for (let i = 0; i < intervalDays; i++) {
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
     dateList.push(`${d.getMonth() + 1}/${d.getDate()}`);
   }
 
-  // 気象データの取得 (Open-Meteo 予報・予測API)
   const useManual = !isNaN(manualSolar) && !isNaN(manualTemp) && !isNaN(manualHum);
 
   if (useManual) {
@@ -135,7 +141,6 @@ async function calculateWaterAndFertilizer() {
     try {
       const sStr = startDate.toISOString().split('T')[0];
       const eStr = endDate.toISOString().split('T')[0];
-      // Open-Meteo forecast API supports future and current dates
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=shortwave_radiation_sum,temperature_2m_mean,relative_humidity_2m_mean&timezone=auto&start_date=${sStr}&end_date=${eStr}`;
       
       const response = await fetch(url);
@@ -175,16 +180,13 @@ async function calculateWaterAndFertilizer() {
   const totalSolar = dailySolars.reduce((acc, cur) => acc + cur, 0);
   const avgSolar = totalSolar / intervalDays;
 
-  // 1. 短波放射・PAR計算モデル
   const avgPar = avgSolar * 0.48;
   const totalPar = totalSolar * 0.48;
 
-  // 2. 群落受光モデル (モンシ・サエキの法則: 消光係数 k = 0.7)
   const k = 0.7;
-  const absorbedRatio = (1 - Math.exp(-k * lai)) * 100; // %
-  const absorbedParTotal = totalPar * (absorbedRatio / 100); // MJ/m²
+  const absorbedRatio = (1 - Math.exp(-k * lai)) * 100;
+  const absorbedParTotal = totalPar * (absorbedRatio / 100);
 
-  // 3. 蒸散量・気象補正モデル
   let baseTranspirationM2 = absorbedParTotal * 0.35;
 
   let tempFactor = 1.0;
@@ -205,13 +207,11 @@ async function calculateWaterAndFertilizer() {
   const totalTranspirationL = transpirationM2 * houseArea;
   const transpirationPlant = transpirationM2 / plantDensity;
 
-  // 4. 給水量設計
   const totalWaterL = totalTranspirationL / 0.85;
   const waterM2 = totalWaterL / houseArea;
   const waterPlant = totalWaterL / totalPlants;
   const requiredMinutes = totalWaterL / flowRate;
 
-  // 5. 施肥・養分収支モデル
   let fertName = "";
   let nRatio = 0, pRatio = 0, kRatio = 0;
   let fertDensityKgL = 1.2;
@@ -246,7 +246,6 @@ async function calculateWaterAndFertilizer() {
   const nExportRatio = supplyN > 0 ? Math.round((outN / supplyN) * 100) : 0;
   const diffN = supplyN - outN;
 
-  // 画面への反映
   document.getElementById('cardTotalTranspirationL').textContent = Math.round(totalTranspirationL).toLocaleString();
   document.getElementById('cardTranspirationM2').textContent = transpirationM2.toFixed(1);
   document.getElementById('cardTranspirationPlant').textContent = transpirationPlant.toFixed(2);
