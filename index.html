@@ -55,6 +55,7 @@
     .info-box ul { padding-left: 20px; margin-bottom: 0; }
     .academic-box { background: #eef6fc; border: 1px solid #b8daff; border-radius: 6px; padding: 15px; margin-top: 15px; font-size: 0.85em; color: #004085; }
     .academic-box h4 { margin: 0 0 8px 0; color: #0056b3; display: flex; align-items: center; gap: 5px; }
+    footer { text-align: center; margin-top: 30px; padding: 15px; font-size: 0.85em; color: #6c757d; border-top: 1px solid #dee2e6; }
   </style>
 </head>
 <body>
@@ -298,9 +299,19 @@
 
     <div class="academic-box">
       <h4>📘 本プログラムの学術・技術的根拠について</h4>
-      <p style="margin: 4px 0;">本アプリのコアロジックは、植物生理学の礎である Monsi & Saeki (1953) の群落光合成・受光理論、国連食糧農業機関（FAO）の FAO-56 基準蒸発散モデル、および<strong>農研機構の施設園芸における養水分管理・施肥基準に関する研究成果</strong>に依拠しています。実際の施設園芸における物質生産と水分消費のダイナミクスに即した実用的な設計を行っています。</p>
+      <p style="margin: 4px 0;">本アプリの算出アルゴリズムは、植物生理学および施設園芸分野で確立された<strong>既存の学術研究モデルおよび公的機関の栽培指針の数式をコード化して利用</strong>しています。</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><strong>PAR・大気透過モデル:</strong> 太陽放射の分光組成特性（直達波長: 43%、散乱波長: 57%）に基づき光合成有効放射を分離計算。</li>
+        <li><strong>受光量モデル:</strong> モンシ・サエキの群落消光理論（Monsi & Saeki, 1953）に準拠。</li>
+        <li><strong>蒸散・気象補正:</strong> FAO-56 基準蒸発散モデル（Penman-Monteith式）のパラメーター化ロジックを採用。</li>
+        <li><strong>施肥基準:</strong> 農林水産省・農研機構（NARO）等の「施設キュウリ養液土耕栽培マニュアル」に基づく標準養分濃度（N: 150ppm基準）を使用。</li>
+      </ul>
     </div>
   </div>
+
+  <footer>
+    &copy; 2026 y-ookuma
+  </footer>
 
   <script src="app.js"></script>
 </body>
