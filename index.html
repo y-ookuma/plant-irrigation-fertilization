@@ -104,11 +104,11 @@
     <label>潅水周期 (日):
       <select id="intervalDays">
         <option value="1">1日ごと (毎日)</option>
-        <option value="2">2日ごと</option>
-        <option value="3" selected>3日ごと</option>
-        <option value="4">4日ごと</option>
-        <option value="5">5日ごと</option>
-        <option value="7">7日ごと</option>
+        <option value="2">2日ごと (未来予測)</option>
+        <option value="3" selected>3日ごと (未来予測)</option>
+        <option value="4">4日ごと (未来予測)</option>
+        <option value="5">5日ごと (未来予測)</option>
+        <option value="7">7日ごと (未来予測)</option>
       </select>
     </label>
     <label>LAI (葉面積指数 m²/m²):
@@ -146,7 +146,7 @@
       <div class="summary-title-area">
         <h3 style="margin:0; color:#2c3e50;">📊 計算・管理ビジュアルサマリー</h3>
         <div class="summary-period-badge">
-          📅 計算対象: <span id="summaryPeriodDates">----/--/-- 〜 ----/--/--</span> (<span id="summaryPeriodDays">0</span>日分)
+          📅 計算対象 (<span id="summaryModeLabel">当日</span>): <span id="summaryPeriodDates">----/--/-- 〜 ----/--/--</span> (<span id="summaryPeriodDays">0</span>日分)
         </div>
       </div>
       <div>
@@ -276,7 +276,13 @@
       <div style="font-weight: bold; color: #2c3e50; margin-bottom: 6px;">📋 適用環境・設備データ一覧</div>
       <table class="data-table">
         <tbody>
-          <tr><th>短波放射 (Rs / GHI)</th><td><span id="resSolar">0.0</span> MJ/m²/日</td></tr>
+          <tr>
+            <th>短波放射 (Rs / GHI)</th>
+            <td>
+              <span id="resSolar">0.0</span> MJ/m²/日
+              <div id="resSolarDetail" style="font-size: 0.85em; color: #555; margin-top: 4px;"></div>
+            </td>
+          </tr>
           <tr><th>PAR (光合成有効放射)</th><td><span id="resPAR">0.0</span> MJ/m²/日</td></tr>
           <tr><th>期間積算PAR / 吸収PAR</th><td>積算PAR <span id="resPARTotal">0.0</span> MJ/m² (吸収PAR <span id="resAbsorbedParTotal">0.0</span> MJ/m²)</td></tr>
           <tr><th>平均気温 / 湿度</th><td><span id="resTemp">0.0</span> °C (<span id="sourceTemp">--</span>) / <span id="resHum">0.0</span> %</td></tr>
