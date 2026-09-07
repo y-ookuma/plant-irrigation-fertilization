@@ -1,169 +1,375 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>キュウリ潅水・施肥計算アプリ</title>
-  <style>
-    body { font-family: sans-serif; max-width: 650px; margin: 20px auto; padding: 15px; line-height: 1.5; color: #333; }
-    .card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fafafa; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    input, select { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
-    input[readonly] { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
-    button { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 15px; }
-    button:hover { background: #218838; }
-    .result { background: #e9f7ef; border-left: 5px solid #28a745; padding: 15px; margin-top: 20px; }
-    .note { font-size: 0.85em; color: #666; font-weight: normal; }
-    .highlight { font-weight: bold; color: #155724; font-size: 1.1em; border-top: 1px solid #c3e6cb; padding-top: 10px; margin-top: 15px; }
-    .harvest-section { background: #eef6fc; border-left: 5px solid #17a2b8; padding: 15px; margin-top: 15px; border-radius: 4px; }
-    .info-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-top: 20px; font-size: 0.9em; }
-    .info-box h4 { margin-top: 0; color: #495057; border-bottom: 2px solid #28a745; padding-bottom: 5px; }
-    .info-box ul { padding-left: 20px; margin-bottom: 0; }
-  </style>
-</head>
-<body>
+// 株数密度(本/m²)のリアルタイム自動計算
+function updatePlantDensity() {
+  const houseArea = parseFloat(document.getElementById('houseArea').value);
+  const totalPlants = parseFloat(document.getElementById('totalPlantsInput').value);
+  const densityInput = document.getElementById('plantDensity');
 
-  <h2>キュウリ 潅水・施肥量計算機</h2>
+  if (!isNaN(houseArea) && houseArea > 0 && !isNaN(totalPlants) && totalPlants > 0) {
+    const density = totalPlants / houseArea;
+    densityInput.value = density.toFixed(2);
+  } else {
+    densityInput.value = '';
+  }
+}
 
-  <div class="card">
-    <h3>1. 位置情報設定</h3>
-    <label>緯度 (Latitude):
-      <input type="number" step="any" id="lat" value="35.6895">
-    </label>
-    <label>経度 (Longitude):
-      <input type="number" step="any" id="lon" value="139.6917">
-    </label>
-    <button type="button" onclick="getCurrentLocation()">現在地から緯度経度を取得</button>
-  </div>
+// 現在地取得
+function getCurrentLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        document.getElementById('lat').value = position.coords.latitude.toFixed(4);
+        document.getElementById('lon').value = position.coords.longitude.toFixed(4);
+        alert('現在地を取得しました');
+      },
+      (error) => {
+        alert('位置情報の取得に失敗しました: ' + error.message);
+      }
+    );
+  } else {
+    alert('お使いのブラウザは位置情報に対応していません');
+  }
+}
 
-  <div class="card">
-    <h3>2. 栽培パラメータ</h3>
+// 日付フォーマットヘルパー (YYYY/MM/DD)
+function formatDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}/${m}/${d}`;
+}
+
+// --------------------------------------------------
+// PNG画像ダウンロード機能
+// --------------------------------------------------
+function downloadSummaryPNG() {
+  const outputElement = document.getElementById('output');
+  const pngBtn = document.querySelector('.btn-png');
+
+  if (typeof html2canvas === 'undefined') {
+    alert('画像キャプチャライブラリの読み込みに失敗しています。インターネット接続をご確認ください。');
+    return;
+  }
+
+  // ボタンを一時的に隠してキャプチャ
+  pngBtn.style.visibility = 'hidden';
+
+  html2canvas(outputElement, {
+    scale: 2, // 高解像度出力
+    backgroundColor: '#ffffff',
+    useCORS: true
+  }).then(canvas => {
+    pngBtn.style.visibility = 'visible';
+
+    const link = document.createElement('a');
+    const today = new Date().toISOString().split('T')[0];
+    link.download = `cucumber_irrigation_summary_${today}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }).catch(err => {
+    pngBtn.style.visibility = 'visible';
+    alert('画像の生成に失敗しました: ' + err.message);
+  });
+}
+
+// --------------------------------------------------
+// JSONエクスポート/インポート機能
+// --------------------------------------------------
+function exportParamsJSON() {
+  const params = {
+    version: "1.2",
+    exportedAt: new Date().toISOString(),
+    location: {
+      latitude: parseFloat(document.getElementById('lat').value) || 0,
+      longitude: parseFloat(document.getElementById('lon').value) || 0
+    },
+    cultivation: {
+      houseArea: parseFloat(document.getElementById('houseArea').value) || 0,
+      totalPlants: parseFloat(document.getElementById('totalPlantsInput').value) || 0,
+      flowRate: parseFloat(document.getElementById('flowRate').value) || 0,
+      intervalDays: parseInt(document.getElementById('intervalDays').value, 10) || 1,
+      lai: parseFloat(document.getElementById('lai').value) || 0,
+      fertilizerType: document.getElementById('fertilizerType').value,
+      harvestKg: document.getElementById('harvestKg').value !== "" ? parseFloat(document.getElementById('harvestKg').value) : null
+    },
+    weatherOverride: {
+      temperature: document.getElementById('temperature').value !== "" ? parseFloat(document.getElementById('temperature').value) : null,
+      humidity: document.getElementById('humidity').value !== "" ? parseFloat(document.getElementById('humidity').value) : null
+    }
+  };
+
+  const jsonStr = JSON.stringify(params, null, 2);
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  
+  const today = new Date().toISOString().split('T')[0];
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `cucumber_params_${today}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importParamsJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      if (data.location) {
+        if (data.location.latitude !== undefined) document.getElementById('lat').value = data.location.latitude;
+        if (data.location.longitude !== undefined) document.getElementById('lon').value = data.location.longitude;
+      }
+
+      if (data.cultivation) {
+        if (data.cultivation.houseArea !== undefined) document.getElementById('houseArea').value = data.cultivation.houseArea;
+        if (data.cultivation.totalPlants !== undefined) document.getElementById('totalPlantsInput').value = data.cultivation.totalPlants;
+        if (data.cultivation.flowRate !== undefined) document.getElementById('flowRate').value = data.cultivation.flowRate;
+        if (data.cultivation.intervalDays !== undefined) document.getElementById('intervalDays').value = data.cultivation.intervalDays;
+        if (data.cultivation.lai !== undefined) document.getElementById('lai').value = data.cultivation.lai;
+        if (data.cultivation.fertilizerType !== undefined) document.getElementById('fertilizerType').value = data.cultivation.fertilizerType;
+        if (data.cultivation.harvestKg !== undefined && data.cultivation.harvestKg !== null) {
+          document.getElementById('harvestKg').value = data.cultivation.harvestKg;
+        } else {
+          document.getElementById('harvestKg').value = "";
+        }
+      }
+
+      if (data.weatherOverride) {
+        document.getElementById('temperature').value = data.weatherOverride.temperature !== null ? data.weatherOverride.temperature : "";
+        document.getElementById('humidity').value = data.weatherOverride.humidity !== null ? data.weatherOverride.humidity : "";
+      }
+
+      updatePlantDensity();
+      alert("設定パラメータをJSONから正常に復元しました。");
+    } catch (err) {
+      alert("JSONファイルの読み込みに失敗しました: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// --------------------------------------------------
+// 計算メイン処理
+// --------------------------------------------------
+async function calculateWaterAndFertilizer() {
+  updatePlantDensity();
+
+  const lat = document.getElementById('lat').value;
+  const lon = document.getElementById('lon').value;
+  const houseArea = parseFloat(document.getElementById('houseArea').value);
+  const totalPlants = parseFloat(document.getElementById('totalPlantsInput').value);
+  const plantDensity = parseFloat(document.getElementById('plantDensity').value);
+  const flowRate = parseFloat(document.getElementById('flowRate').value);
+  const intervalDays = parseInt(document.getElementById('intervalDays').value, 10) || 1;
+  const lai = parseFloat(document.getElementById('lai').value);
+  const fertilizerType = document.getElementById('fertilizerType').value;
+  const harvestKgInput = document.getElementById('harvestKg').value;
+
+  let inputTemp = document.getElementById('temperature').value;
+  let inputHum = document.getElementById('humidity').value;
+
+  if (isNaN(houseArea) || houseArea <= 0 || isNaN(totalPlants) || totalPlants <= 0 || isNaN(flowRate) || flowRate <= 0 || isNaN(lai) || lai <= 0) {
+    alert('入力パラメータを正しく設定してください');
+    return;
+  }
+
+  // 日付・期間の設定
+  const startDate = new Date();
+  const endDate = new Date();
+  endDate.setDate(startDate.getDate() + (intervalDays - 1));
+
+  let periodString = "";
+  if (intervalDays === 1) {
+    periodString = `${formatDate(startDate)}`;
+  } else {
+    periodString = `${formatDate(startDate)} 〜 ${formatDate(endDate)}`;
+  }
+
+  // APIデータ用配列・デフォルト初期値
+  let dailySolarList = new Array(intervalDays).fill(15.0);
+  let dailyTempList = new Array(intervalDays).fill(25.0);
+  let isApiSuccess = false;
+
+  try {
+    const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=shortwave_radiation_sum,temperature_2m_mean&forecast_days=${intervalDays}&timezone=auto`;
+    const response = await fetch(apiUrl);
     
-    <label>ハウス面積 (m²):
-      <input type="number" step="1" id="houseArea" value="1000" oninput="updatePlantDensity()" onchange="updatePlantDensity()" required>
-    </label>
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.daily && data.daily.shortwave_radiation_sum) {
+        dailySolarList = data.daily.shortwave_radiation_sum;
+        dailyTempList = data.daily.temperature_2m_mean;
+        isApiSuccess = true;
+      }
+    }
+  } catch (err) {
+    console.warn("Open-Meteo取得エラー。デフォルト値で続行します:", err);
+  }
 
-    <label>総株数 (本):
-      <input type="number" step="1" id="totalPlantsInput" value="3000" oninput="updatePlantDensity()" onchange="updatePlantDensity()" required>
-    </label>
+  const finalHum = inputHum !== "" ? parseFloat(inputHum) : 65.0;
 
-    <label>株数密度 (本/m²) <span class="note">※自動計算</span>:
-      <input type="number" id="plantDensity" value="3.00" readonly>
-    </label>
+  // --- 【未来気象データの積算計算】 ---
+  const k = 0.7;
+  const lightInterceptionFraction = 1 - Math.exp(-k * lai);
 
-    <label>LAI (葉面積指数 m²/m²) <span class="note">※育苗期: 0.5〜1.0 / 収穫期: 3.0〜4.5</span>:
-      <input type="number" step="0.1" id="lai" value="3.5" required>
-    </label>
+  let accumulatedWaterPerM2 = 0;
+  let totalSolarSum = 0;
+  let totalTempSum = 0;
 
-    <label>使用液肥銘柄:
-      <select id="fertilizerType">
-        <option value="black">トミー液肥ブラック (N:10% - P:4% - K:6%)</option>
-        <option value="green">トミー液肥グリーン (N:6% - P:8% - K:8%)</option>
-      </select>
-    </label>
+  for (let i = 0; i < intervalDays; i++) {
+    const daySolar = dailySolarList[i] ?? 15.0;
+    const dayTemp = inputTemp !== "" ? parseFloat(inputTemp) : (dailyTempList[i] ?? 25.0);
 
-    <label>本日のハウス全体のコンテナ/収穫量 (kg) <span class="note">※任意入力（乾物NPK計算用）</span>:
-      <input type="number" step="0.1" id="harvestKg" placeholder="例: 150">
-    </label>
-  </div>
+    totalSolarSum += daySolar;
+    totalTempSum += dayTemp;
 
-  <div class="card">
-    <h3>3. 気象パラメータ</h3>
+    const absorbedSolarDay = daySolar * lightInterceptionFraction;
+    let dayWaterPerM2 = absorbedSolarDay * 0.35;
 
-    <label>平均気温 (°C) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
-      <input type="number" step="0.1" id="temperature" placeholder="自動取得">
-    </label>
+    if (dayTemp > 25) {
+      dayWaterPerM2 *= (1 + (dayTemp - 25) * 0.02);
+    }
+    if (finalHum < 50) {
+      dayWaterPerM2 *= (1 + (50 - finalHum) * 0.005);
+    }
 
-    <label>平均湿度 (%) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
-      <input type="number" step="0.1" id="humidity" placeholder="自動取得">
-    </label>
-  </div>
+    accumulatedWaterPerM2 += dayWaterPerM2;
+  }
 
-  <button type="button" onclick="calculateWaterAndFertilizer()">計算実行</button>
+  const avgSolar = totalSolarSum / intervalDays;
+  const avgTemp = totalTempSum / intervalDays;
+  const avgAbsorbedSolar = avgSolar * lightInterceptionFraction;
 
-  <div id="output" class="result" style="display:none;">
-    <h3>計算結果</h3>
-    <p><strong>適用環境データ:</strong></p>
-    <ul>
-      <li>日射量: <span id="resSolar"></span> MJ/m²</li>
-      <li>気温: <span id="resTemp"></span> °C (<span id="sourceTemp"></span>)</li>
-      <li>湿度: <span id="resHum"></span> % (<span id="sourceHum"></span>)</li>
-      <li>LAI: <span id="resLAI"></span></li>
-      <li>総株数: <span id="resTotalPlants"></span> 株</li>
-    </ul>
+  const waterPerM2 = accumulatedWaterPerM2;
+  const waterPerPlant = waterPerM2 / plantDensity;
 
-    <p><strong>【単位面積・1株あたり管理量 (1日)】</strong></p>
-    <ul>
-      <li><strong>必要潅水量:</strong> <span id="resWaterM2"></span> L/m² (<span id="resWaterPlant"></span> L/株)</li>
-      <li><strong>1株あたり施肥目安量 (成分量):</strong>
-        <ul>
-          <li>窒素 (N): <span id="resN"></span> g/株</li>
-          <li>リン酸 (P): <span id="resP"></span> g/株</li>
-          <li>カリウム (K): <span id="resK"></span> g/株</li>
-        </ul>
-      </li>
-    </ul>
+  const nPerPlant = waterPerPlant * 0.15;
+  const pPerPlant = waterPerPlant * 0.04;
+  const kPerPlant = waterPerPlant * 0.20;
 
-    <p class="highlight"><strong>【ハウス全体での1日合計管理量】</strong></p>
-    <ul>
-      <li><strong>総潅水量:</strong> <span id="resTotalWaterL"></span> L (<span id="resTotalWaterTon"></span> m³/t)</li>
-      <li><strong>総施肥量 (純成分量):</strong>
-        <ul>
-          <li>窒素 (N): <span id="resTotalN"></span> kg</li>
-          <li>リン酸 (P): <span id="resTotalP"></span> kg</li>
-          <li>カリウム (K): <span id="resTotalK"></span> kg</li>
-        </ul>
-      </li>
-      <li><strong>選択液肥使用量 (<span id="resFertName"></span>):</strong>
-        <ul>
-          <li>必要液肥量: <strong style="color: #155724;"><span id="resFertL"></span> L</strong> （約 <span id="resFertKg"></span> kg）</li>
-          <li>希釈倍率目安: 約 <span id="resDilution"></span> 倍（潅水量に対して）</li>
-        </ul>
-      </li>
-    </ul>
+  const totalWaterL = waterPerM2 * houseArea;
+  const totalNKg = (nPerPlant * totalPlants) / 1000;
+  const totalPKg = (pPerPlant * totalPlants) / 1000;
+  const totalKKg = (kPerPlant * totalPlants) / 1000;
 
-    <!-- 収穫物乾物NPK持ち出し量計算領域 -->
-    <div id="harvestResult" class="harvest-section" style="display:none;">
-      <p style="margin-top:0; font-weight:bold; color:#0c5460;">【収穫物からの乾物NPK持ち出し量】</p>
-      <ul>
-        <li>本日収穫量: <strong><span id="resHarvestKg"></span> kg</strong> （生重）</li>
-        <li>推定乾物重: <strong><span id="resDryMatterKg"></span> kg</strong> （乾物率 4.0% 換算）</li>
-        <li><strong>果実持ち出し養成分量:</strong>
-          <ul>
-            <li>窒素 (N): <strong><span id="resHarvestN"></span> kg</strong> (乾物中 3.0%)</li>
-            <li>リン酸 (P): <strong><span id="resHarvestP"></span> kg</strong> (乾物中 1.0%)</li>
-            <li>カリウム (K): <strong><span id="resHarvestK"></span> kg</strong> (乾物中 4.5%)</li>
-          </ul>
-        </li>
-      </ul>
-    </div>
+  const totalMinutes = totalWaterL / flowRate;
+  const minutes = Math.floor(totalMinutes);
+  const seconds = Math.round((totalMinutes - minutes) * 60);
+  const timeString = `${minutes}分${seconds}秒 (${totalMinutes.toFixed(1)}分)`;
 
-    <!-- 根拠解説インフォメーション -->
-    <div class="info-box">
-      <h4>💡 計算式の根拠・モデル仕様</h4>
-      <ul>
-        <li><strong>受光量・蒸散計算（光の吸収モデル）:</strong><br>
-          キュウリ群落の葉が光を遮る割合（受光率）を「消光係数 0.7」と「LAI（葉面積指数）」から算出しています。<br>
-          <code>受光率 = 1 - (2.718 の -0.7 × LAI 乗)</code><br>
-          この受光率に日射量（MJ/m²）を掛け合わせた「作物受け取りエネルギー」に対し、基本蒸散効率として <strong>1 MJ あたり 0.35 L/m²</strong> の水を必要量として計算します。
-        </li>
-        <li><strong>気象補正（気温と湿度の影響）:</strong><br>
-          日平均気温が <strong>25 ℃</strong> を超える場合は、1 ℃ 上がるごとに <strong>2% 増量</strong> します。<br>
-          日平均湿度が <strong>50 %</strong> を下回る（空気が乾燥する）場合は、1 % 下がるごとに <strong>0.5% 増量</strong> して乾燥ストレスを補正します。
-        </li>
-        <li><strong>施肥濃度（窒素基準）:</strong><br>
-          養液土耕における標準的な施肥基準（目標窒素濃度 <strong>150 ppm = 0.15 g/L</strong>）を適用し、潅水量に応じた窒素・リン酸・カリの必要純成分量を算出しています。
-        </li>
-        <li><strong>液肥換算:</strong><br>
-          選択した液肥の窒素（N）保証成分量をもとに、目標窒素量を満たすために必要な液肥原液の量（Lおよびkg）を自動計算します（原液の比重は 1.2 g/mL として換算）。
-        </li>
-        <li><strong>収穫物持ち出しNPK量:</strong><br>
-          キュウリ果実の標準乾物率を <strong>4%</strong>（水分 96%）、乾物中の成分含有量を <strong>N: 3.0%、P: 1.0%、K: 4.5%</strong> と定めて果実によるハウス外への養分持ち出し量を試算します。
-        </li>
-      </ul>
-    </div>
-  </div>
+  let nPercent = 0.10;
+  let pPercent = 0.04;
+  let kPercent = 0.06;
+  let fertName = "トミー液肥ブラック";
 
-  <script src="app.js"></script>
-</body>
-</html>
+  if (fertilizerType === "green") {
+    nPercent = 0.06;
+    pPercent = 0.08;
+    kPercent = 0.08;
+    fertName = "トミー液肥グリーン";
+  } else if (fertilizerType === "okf1") {
+    nPercent = 0.15;
+    pPercent = 0.08;
+    kPercent = 0.17;
+    fertName = "OK-F-1";
+  }
+
+  const densityFert = 1.2;
+  const fertRequiredKg = totalNKg / nPercent;
+  const fertRequiredL = fertRequiredKg / densityFert;
+  const dilutionRatio = Math.round(totalWaterL / fertRequiredL);
+
+  const supplyNKg = fertRequiredKg * nPercent;
+  const supplyPKg = fertRequiredKg * pPercent;
+  const supplyKKg = fertRequiredKg * kPercent;
+  const supplyTotalKg = supplyNKg + supplyPKg + supplyKKg;
+
+  const harvestKg = parseFloat(harvestKgInput) || 0;
+  const dryMatterKg = harvestKg * 0.04;
+
+  const outNKg = dryMatterKg * 0.030;
+  const outPKg = dryMatterKg * 0.010;
+  const outKKg = dryMatterKg * 0.045;
+  const outTotalKg = outNKg + outPKg + outKKg;
+
+  const diffNKg = supplyNKg - outNKg;
+  const nRatio = supplyNKg > 0 ? (outNKg / supplyNKg) * 100 : 0;
+
+  // --- 【画面描画・視覚更新】 ---
+  // 日付・期間表示のセット
+  document.getElementById('summaryPeriodDates').innerText = periodString;
+  document.getElementById('summaryPeriodDays').innerText = intervalDays;
+
+  // 1. トップ指標カード
+  document.getElementById('cardTotalWaterL').innerText = Math.round(totalWaterL).toLocaleString();
+  document.getElementById('cardWaterM2').innerText = waterPerM2.toFixed(2);
+  document.getElementById('cardWaterPlant').innerText = waterPerPlant.toFixed(2);
+  document.getElementById('cardWaterTime').innerText = timeString;
+  document.getElementById('cardIntervalText').innerText = intervalDays === 1 ? "毎日" : `${intervalDays}日分予報積算`;
+
+  document.getElementById('cardFertL').innerText = fertRequiredL.toFixed(1);
+  document.getElementById('cardFertName').innerText = fertName;
+  document.getElementById('cardFertKg').innerText = fertRequiredKg.toFixed(1);
+  document.getElementById('cardDilution').innerText = dilutionRatio.toLocaleString();
+
+  document.getElementById('cardDryMatter').innerText = dryMatterKg.toFixed(2);
+  document.getElementById('cardHarvestKg').innerText = harvestKg.toFixed(1);
+
+  // 2. 養分収支比較SVGダイアグラムの更新
+  document.getElementById('balanceFertLabel').textContent = fertName;
+  document.getElementById('balSupplyN').textContent = supplyNKg.toFixed(2);
+  document.getElementById('balSupplyP').textContent = supplyPKg.toFixed(2);
+  document.getElementById('balSupplyK').textContent = supplyKKg.toFixed(2);
+  document.getElementById('balSupplyTotal').textContent = supplyTotalKg.toFixed(2);
+
+  document.getElementById('balHarvestVal').textContent = harvestKg.toFixed(1);
+  document.getElementById('balOutN').textContent = outNKg.toFixed(2);
+  document.getElementById('balOutP').textContent = outPKg.toFixed(2);
+  document.getElementById('balOutK').textContent = outKKg.toFixed(2);
+  document.getElementById('balOutTotal').textContent = outTotalKg.toFixed(2);
+
+  const diffSign = diffNKg >= 0 ? "+" : "";
+  document.getElementById('balDiffN').textContent = `${diffSign}${diffNKg.toFixed(2)}`;
+  document.getElementById('nExportRatio').textContent = nRatio.toFixed(1);
+
+  // 3. ☀️ 日射量・受光SVGダイアグラム数値更新
+  const svgSolarEl = document.getElementById('svgSolarVal');
+  const svgLaiEl = document.getElementById('svgLaiVal');
+  const svgInterceptionEl = document.getElementById('svgInterceptionPct');
+  const svgAbsorbedEl = document.getElementById('svgAbsorbedSolar');
+
+  if (svgSolarEl) svgSolarEl.textContent = avgSolar.toFixed(1);
+  if (svgLaiEl) svgLaiEl.textContent = lai.toFixed(1);
+  if (svgInterceptionEl) svgInterceptionEl.textContent = (lightInterceptionFraction * 100).toFixed(0);
+  if (svgAbsorbedEl) svgAbsorbedEl.textContent = avgAbsorbedSolar.toFixed(2);
+
+  // 4. 養分プログレスバー設定
+  document.getElementById('barNVal').innerText = totalNKg.toFixed(2);
+  document.getElementById('barPVal').innerText = totalPKg.toFixed(2);
+  document.getElementById('barKVal').innerText = totalKKg.toFixed(2);
+
+  const pWidth = Math.min(Math.round((totalPKg / totalNKg) * 100), 100);
+  const kWidth = Math.min(Math.round((totalKKg / totalNKg) * 100), 100);
+  document.getElementById('barP').style.width = pWidth + '%';
+  document.getElementById('barK').style.width = kWidth + '%';
+
+  // 5. テキスト情報
+  const tempSourceStr = inputTemp !== "" ? "手動指定" : (isApiSuccess ? `${intervalDays}日間予報平均` : "デフォルト");
+  document.getElementById('resSolar').innerText = `${avgSolar.toFixed(1)} (平均)`;
+  document.getElementById('resTemp').innerText = avgTemp.toFixed(1);
+  document.getElementById('sourceTemp').innerText = tempSourceStr;
+  document.getElementById('resHum').innerText = finalHum.toFixed(1);
+  document.getElementById('resLAI').innerText = lai.toFixed(1);
+  document.getElementById('resTotalPlants').innerText = totalPlants.toLocaleString();
+  document.getElementById('resFlowRate').innerText = flowRate.toFixed(1);
+
+  document.getElementById('output').style.display = 'block';
+}
+
+// 初期ロード処理
+document.addEventListener('DOMContentLoaded', () => {
+  updatePlantDensity();
+});
