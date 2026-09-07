@@ -1,7 +1,7 @@
-import { loadEnv } from "../src/env_loader.js";
-import { calcCucumberLAI } from "../src/lai_cucumber.js";
-import { calcIrrigationFromEnv } from "../src/irrigation.js";
-import { calcNPK } from "../src/fertilization.js";
+import { loadEnv } from "./../src/env_loader.js";
+import { calcCucumberLAI } from "./../src/lai_cucumber.js";
+import { calcIrrigationFromEnv } from "./../src/irrigation.js";
+import { calcNPK } from "./../src/fertilization.js";
 
 // 折れ線グラフ
 function drawLineGraph(id, data, label) {
@@ -158,42 +158,4 @@ ET: ${result.ET.toFixed(2)} L/m2/day
 N: ${fert.N.toFixed(2)} g/株/day
 P: ${fert.P.toFixed(2)} g/株/day
 K: ${fert.K.toFixed(2)} g/株/day`;
-};
-
-// CSV保存
-document.getElementById("csvBtn").onclick = () => {
-  const row = document.querySelector("#npkTable tbody tr");
-  if (!row) return;
-  const N = row.children[0].textContent;
-  const P = row.children[1].textContent;
-  const K = row.children[2].textContent;
-
-  const rows = [["N","P","K"], [N, P, K]];
-  const csv = rows.map(r => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "npk施肥量.csv";
-  a.click();
-};
-
-// PNG保存
-document.getElementById("pngBtn").onclick = () => {
-  const svg = document.getElementById("graphNPK");
-  const svgData = new XMLSerializer().serializeToString(svg);
-  const canvas = document.createElement("canvas");
-  canvas.width = svg.clientWidth;
-  canvas.height = svg.clientHeight;
-  const ctx = canvas.getContext("2d");
-  const img = new Image();
-  img.onload = () => {
-    ctx.drawImage(img, 0, 0);
-    const png = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = png;
-    a.download = "npk施肥量グラフ.png";
-    a.click();
-  };
-  img.src = "data:image/svg+xml;base64," + btoa(svgData);
 };
