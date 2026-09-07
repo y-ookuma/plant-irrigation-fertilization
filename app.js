@@ -84,4 +84,78 @@ function drawYieldGraph(id, data, label) {
 }
 
 // NPKテーブル更新
-function updateN
+function updateNPKTable(N, P, K) {
+  const tbody = document.querySelector("#npkTable tbody");
+  tbody.innerHTML = `
+    <tr>
+      <td>${N.toFixed(2)}</td>
+      <td>${P.toFixed(2)}</td>
+      <td>${K.toFixed(2)}</td>
+    </tr>
+  `;
+}
+
+document.getElementById("calcGraph").onclick = async () => {
+
+  const crop = document.getElementById("crop").value;
+
+  const cropFactor = {
+    cucumber: 1.0,
+    tomato: 0.85,
+    pepper: 0.75,
+    strawberry: 0.55
+  }[crop];
+
+  const env = await loadEnv();
+  const leafAges = [10, 15, 20, 25];
+  const LAI = calcCucumberLAI(leafAges);
+
+  const temp = parseFloat(document.getElementById("temp").value) || null;
+  const rh = parseFloat(document.getElementById("rh").value) || null;
+  const plant_density = parseFloat(document.getElementById("density").value);
+  const ground_area = parseFloat(document.getElementById("area").value);
+
+  const result = calcIrrigationFromEnv(LAI, env, {
+    temp,
+    rh,
+    plant_density,
+    ground_area,
+    leaching: 1.1,
+    crop_factor: cropFactor
+  });
+
+  const fert = calcNPK(result.ET, crop);
+
+  const sw = env.shortwave.slice(0, 24);
+  const tArr = env.temp.slice(0, 24);
+  const irrArr = Array(24).fill(result.irrigation_per_plant);
+  const Ndata = Array(24).fill(fert.N);
+  const Pdata = Array(24).fill(fert.P);
+  const Kdata = Array(24).fill(fert.K);
+  const yieldData = Array(24).fill(fert.Y);
+
+  drawLineGraph("graphSW", sw, "短波放射 (W/m2)");
+  drawLineGraph("graphT", tArr, "気温 (℃)");
+  drawLineGraph("graphIrr", irrArr, "潅水量 (L/株/day)");
+  drawNPKGraph("graphNPK", Ndata, Pdata, Kdata);
+  drawYieldGraph("graphYield", yieldData, "収量予測 (kg/株/day)");
+  updateNPKTable(fert.N, fert.P, fert.K);
+
+  document.getElementById("output").textContent =
+    `作物: ${crop}
+LAI: ${LAI.toFixed(2)}
+DLI: ${result.DLI.toFixed(1)} mol/m2/day
+気温: ${result.T.toFixed(1)} ℃
+湿度: ${result.RH.toFixed(1)} %
+VPD: ${result.VPD.toFixed(2)} kPa
+ET: ${result.ET.toFixed(2)} L/m2/day
+潅水量: ${result.irrigation_per_plant.toFixed(2)} L/株/day
+
+--- 収量予測モデル ---
+収量推定: ${fert.Y.toFixed(2)} kg/株/day
+
+--- 収量比例施肥 ---
+N: ${fert.N.toFixed(2)} g/株/day
+P: ${fert.P.toFixed(2)} g/株/day
+K: ${fert.K.toFixed(2)} g/株/day`;
+};
