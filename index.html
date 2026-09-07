@@ -2,76 +2,82 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>LAI潅水・施肥モデル</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- D3.js -->
-  <script src="d3.min.js"></script>
-
-  <!-- CSS -->
-  <link rel="stylesheet" href="styles.css">
+  <title>キュウリ潅水・施肥計算アプリ (LAI対応)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 15px; line-height: 1.5; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fafafa; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    button { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 15px; }
+    button:hover { background: #218838; }
+    .result { background: #e9f7ef; border-left: 5px solid #28a745; padding: 15px; margin-top: 20px; }
+    .note { font-size: 0.85em; color: #666; font-weight: normal; }
+  </style>
 </head>
-
 <body>
-  <h2>LAI → 潅水量 → NPK施肥モデル</h2>
 
-  <label>作物:</label>
-  <select id="crop">
-    <option value="cucumber">キュウリ</option>
-    <option value="tomato">トマト</option>
-    <option value="pepper">ピーマン</option>
-    <option value="strawberry">イチゴ</option>
-  </select>
+  <h2>キュウリ 潅水・施肥量計算機</h2>
 
-  <br><br>
+  <div class="card">
+    <h3>1. 位置情報設定</h3>
+    <label>緯度 (Latitude):
+      <input type="number" step="any" id="lat" value="35.6895">
+    </label>
+    <label>経度 (Longitude):
+      <input type="number" step="any" id="lon" value="139.6917">
+    </label>
+    <button type="button" onclick="getCurrentLocation()">現在地から緯度経度を取得</button>
+  </div>
 
-  <label>気温(℃):</label>
-  <input id="temp" type="number" placeholder="未入力なら屋外値">
+  <div class="card">
+    <h3>2. 栽培パラメータ</h3>
+    
+    <label>株数 (本/m²):
+      <input type="number" step="0.1" id="plantDensity" value="3.0" required>
+    </label>
 
-  <label>湿度(%):</label>
-  <input id="rh" type="number" placeholder="未入力なら屋外値">
+    <label>LAI (葉面積指数 m²/m²) <span class="note">※育苗期: 0.5〜1.0 / 収穫期: 3.0〜4.5</span>:
+      <input type="number" step="0.1" id="lai" value="3.5" required>
+    </label>
+  </div>
 
-  <br><br>
+  <div class="card">
+    <h3>3. 気象パラメータ</h3>
 
-  <label>株数/m2:</label>
-  <input id="density" type="number" value="2.5">
+    <label>平均気温 (°C) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
+      <input type="number" step="0.1" id="temperature" placeholder="自動取得">
+    </label>
 
-  <label>面積m2/株:</label>
-  <input id="area" type="number" value="0.30">
+    <label>平均湿度 (%) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
+      <input type="number" step="0.1" id="humidity" placeholder="自動取得">
+    </label>
+  </div>
 
-  <br><br>
+  <button onclick="calculateWaterAndFertilizer()">計算実行</button>
 
-  <button id="calcGraph">計算＆グラフ表示</button>
+  <div id="output" class="result" style="display:none;">
+    <h3>計算結果</h3>
+    <p><strong>適用環境データ:</strong></p>
+    <ul>
+      <li>日射量: <span id="resSolar"></span> MJ/m²</li>
+      <li>気温: <span id="resTemp"></span> °C (<span id="sourceTemp"></span>)</li>
+      <li>湿度: <span id="resHum"></span> % (<span id="sourceHum"></span>)</li>
+      <li>遮光率調整後 LAI: <span id="resLAI"></span></li>
+    </ul>
+    <p><strong>推奨管理量 (1日あたり):</strong></p>
+    <ul>
+      <li><strong>必要潅水量:</strong> <span id="resWaterM2"></span> L/m² (<span id="resWaterPlant"></span> L/株)</li>
+      <li><strong>推定NPK施肥目安量 (1株あたり):</strong>
+        <ul>
+          <li>窒素 (N): <span id="resN"></span> g/株</li>
+          <li>リン酸 (P): <span id="resP"></span> g/株</li>
+          <li>カリウム (K): <span id="resK"></span> g/株</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
 
-  <pre id="output"></pre>
-
-  <h3>短波放射</h3>
-  <svg id="graphSW"></svg>
-
-  <h3>気温</h3>
-  <svg id="graphT"></svg>
-
-  <h3>潅水量</h3>
-  <svg id="graphIrr"></svg>
-
-  <h3>NPK複合グラフ</h3>
-  <svg id="graphNPK"></svg>
-
-  <h3>収量予測（kg/株/day）</h3>
-  <svg id="graphYield"></svg>
-
-  <h3>NPK施肥量（g/株/day）</h3>
-  <table id="npkTable">
-    <thead>
-      <tr><th>N</th><th>P</th><th>K</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <button id="csvBtn">NPK CSV保存</button>
-  <button id="pngBtn">NPKグラフ PNG保存</button>
-
-  <!-- app.js を module として読み込む -->
-  <script type="module" src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
