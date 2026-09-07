@@ -10,6 +10,14 @@
 <body>
   <h2>LAI → 潅水量 → NPK施肥モデル</h2>
 
+  作物:
+  <select id="crop">
+    <option value="cucumber">キュウリ</option>
+    <option value="tomato">トマト</option>
+    <option value="pepper">ピーマン</option>
+    <option value="strawberry">イチゴ</option>
+  </select>
+
   気温(℃): <input id="temp" type="number" placeholder="未入力なら屋外値"><br>
   湿度(%): <input id="rh" type="number" placeholder="未入力なら屋外値"><br>
   株数/m2: <input id="density" type="number" value="2.5"><br>
@@ -30,6 +38,9 @@
 
   <h3>NPK複合グラフ</h3>
   <svg id="graphNPK"></svg>
+
+  <h3>収量予測（kg/株/day）</h3>
+  <svg id="graphYield"></svg>
 
   <h3>NPK施肥量（g/株/day）</h3>
   <table id="npkTable">
