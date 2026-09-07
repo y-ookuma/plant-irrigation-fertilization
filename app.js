@@ -38,9 +38,7 @@ function formatDate(date) {
   return `${y}/${m}/${d}`;
 }
 
-// --------------------------------------------------
 // PNG画像ダウンロード機能
-// --------------------------------------------------
 function downloadSummaryPNG() {
   const outputElement = document.getElementById('output');
   const pngBtn = document.querySelector('.btn-png');
@@ -50,11 +48,10 @@ function downloadSummaryPNG() {
     return;
   }
 
-  // ボタンを一時的に隠してキャプチャ
   pngBtn.style.visibility = 'hidden';
 
   html2canvas(outputElement, {
-    scale: 2, // 高解像度出力
+    scale: 2,
     backgroundColor: '#ffffff',
     useCORS: true
   }).then(canvas => {
@@ -71,12 +68,10 @@ function downloadSummaryPNG() {
   });
 }
 
-// --------------------------------------------------
 // JSONエクスポート/インポート機能
-// --------------------------------------------------
 function exportParamsJSON() {
   const params = {
-    version: "1.2",
+    version: "1.4",
     exportedAt: new Date().toISOString(),
     location: {
       latitude: parseFloat(document.getElementById('lat').value) || 0,
@@ -151,9 +146,7 @@ function importParamsJSON(event) {
   reader.readAsText(file);
 }
 
-// --------------------------------------------------
 // 計算メイン処理
-// --------------------------------------------------
 async function calculateWaterAndFertilizer() {
   updatePlantDensity();
 
@@ -181,14 +174,9 @@ async function calculateWaterAndFertilizer() {
   const endDate = new Date();
   endDate.setDate(startDate.getDate() + (intervalDays - 1));
 
-  let periodString = "";
-  if (intervalDays === 1) {
-    periodString = `${formatDate(startDate)}`;
-  } else {
-    periodString = `${formatDate(startDate)} 〜 ${formatDate(endDate)}`;
-  }
+  let periodString = intervalDays === 1 ? formatDate(startDate) : `${formatDate(startDate)} 〜 ${formatDate(endDate)}`;
 
-  // APIデータ用配列・デフォルト初期値
+  // APIデータ用配列
   let dailySolarList = new Array(intervalDays).fill(15.0);
   let dailyTempList = new Array(intervalDays).fill(25.0);
   let isApiSuccess = false;
@@ -211,7 +199,7 @@ async function calculateWaterAndFertilizer() {
 
   const finalHum = inputHum !== "" ? parseFloat(inputHum) : 65.0;
 
-  // --- 【未来気象データの積算計算】 ---
+  // --- 【未来気象データ・PAR・蒸散の積算計算】 ---
   const k = 0.7;
   const lightInterceptionFraction = 1 - Math.exp(-k * lai);
 
@@ -239,18 +227,25 @@ async function calculateWaterAndFertilizer() {
     accumulatedWaterPerM2 += dayWaterPerM2;
   }
 
-  const avgSolar = totalSolarSum / intervalDays;
+  const avgSolar = totalSolarSum / intervalDays; // 短波放射 (Rs) 平均 (MJ/m²/日)
+  const avgPar = avgSolar * 0.48;                // PAR 平均 (MJ/m²/日)
+  const totalParSum = totalSolarSum * 0.48;       // 期間合計 PAR (MJ/m²)
+  const absorbedParTotal = totalParSum * lightInterceptionFraction; // 作物が吸収した総PAR (MJ/m²)
   const avgTemp = totalTempSum / intervalDays;
-  const avgAbsorbedSolar = avgSolar * lightInterceptionFraction;
 
-  const waterPerM2 = accumulatedWaterPerM2;
-  const waterPerPlant = waterPerM2 / plantDensity;
+  // 蒸散量・給水量・施肥計算値
+  const transpirationM2 = accumulatedWaterPerM2; 
+  const transpirationTotalL = transpirationM2 * houseArea; 
+  const transpirationPerPlant = transpirationM2 / plantDensity; 
+
+  const waterPerM2 = transpirationM2;
+  const waterPerPlant = transpirationPerPlant;
 
   const nPerPlant = waterPerPlant * 0.15;
   const pPerPlant = waterPerPlant * 0.04;
   const kPerPlant = waterPerPlant * 0.20;
 
-  const totalWaterL = waterPerM2 * houseArea;
+  const totalWaterL = transpirationTotalL;
   const totalNKg = (nPerPlant * totalPlants) / 1000;
   const totalPKg = (pPerPlant * totalPlants) / 1000;
   const totalKKg = (kPerPlant * totalPlants) / 1000;
@@ -260,20 +255,14 @@ async function calculateWaterAndFertilizer() {
   const seconds = Math.round((totalMinutes - minutes) * 60);
   const timeString = `${minutes}分${seconds}秒 (${totalMinutes.toFixed(1)}分)`;
 
-  let nPercent = 0.10;
-  let pPercent = 0.04;
-  let kPercent = 0.06;
+  let nPercent = 0.10, pPercent = 0.04, kPercent = 0.06;
   let fertName = "トミー液肥ブラック";
 
   if (fertilizerType === "green") {
-    nPercent = 0.06;
-    pPercent = 0.08;
-    kPercent = 0.08;
+    nPercent = 0.06; pPercent = 0.08; kPercent = 0.08;
     fertName = "トミー液肥グリーン";
   } else if (fertilizerType === "okf1") {
-    nPercent = 0.15;
-    pPercent = 0.08;
-    kPercent = 0.17;
+    nPercent = 0.15; pPercent = 0.08; kPercent = 0.17;
     fertName = "OK-F-1";
   }
 
@@ -299,16 +288,18 @@ async function calculateWaterAndFertilizer() {
   const nRatio = supplyNKg > 0 ? (outNKg / supplyNKg) * 100 : 0;
 
   // --- 【画面描画・視覚更新】 ---
-  // 日付・期間表示のセット
   document.getElementById('summaryPeriodDates').innerText = periodString;
   document.getElementById('summaryPeriodDays').innerText = intervalDays;
 
   // 1. トップ指標カード
+  document.getElementById('cardTotalTranspirationL').innerText = Math.round(transpirationTotalL).toLocaleString();
+  document.getElementById('cardTranspirationM2').innerText = transpirationM2.toFixed(2);
+  document.getElementById('cardTranspirationPlant').innerText = transpirationPerPlant.toFixed(2);
+
   document.getElementById('cardTotalWaterL').innerText = Math.round(totalWaterL).toLocaleString();
   document.getElementById('cardWaterM2').innerText = waterPerM2.toFixed(2);
   document.getElementById('cardWaterPlant').innerText = waterPerPlant.toFixed(2);
   document.getElementById('cardWaterTime').innerText = timeString;
-  document.getElementById('cardIntervalText').innerText = intervalDays === 1 ? "毎日" : `${intervalDays}日分予報積算`;
 
   document.getElementById('cardFertL').innerText = fertRequiredL.toFixed(1);
   document.getElementById('cardFertName').innerText = fertName;
@@ -318,7 +309,17 @@ async function calculateWaterAndFertilizer() {
   document.getElementById('cardDryMatter').innerText = dryMatterKg.toFixed(2);
   document.getElementById('cardHarvestKg').innerText = harvestKg.toFixed(1);
 
-  // 2. 養分収支比較SVGダイアグラムの更新
+  // 2. ☀️ 短波放射(Rs)・PAR・光吸収SVGダイアグラム更新
+  document.getElementById('svgSolarVal').textContent = avgSolar.toFixed(1);
+  document.getElementById('svgParVal').textContent = avgPar.toFixed(1);
+  document.getElementById('svgLaiVal').textContent = lai.toFixed(1);
+  document.getElementById('svgAbsorbedRatio').textContent = Math.round(lightInterceptionFraction * 100);
+  document.getElementById('svgTranspirationM2').textContent = transpirationM2.toFixed(2);
+  document.getElementById('svgTranspirationTotal').textContent = Math.round(transpirationTotalL).toLocaleString();
+  document.getElementById('svgAbsorbedPar').textContent = absorbedParTotal.toFixed(1);
+  document.getElementById('svgTranspirationPlant').textContent = transpirationPerPlant.toFixed(2);
+
+  // 3. 養分収支SVGダイアグラム更新
   document.getElementById('balanceFertLabel').textContent = fertName;
   document.getElementById('balSupplyN').textContent = supplyNKg.toFixed(2);
   document.getElementById('balSupplyP').textContent = supplyPKg.toFixed(2);
@@ -335,17 +336,6 @@ async function calculateWaterAndFertilizer() {
   document.getElementById('balDiffN').textContent = `${diffSign}${diffNKg.toFixed(2)}`;
   document.getElementById('nExportRatio').textContent = nRatio.toFixed(1);
 
-  // 3. ☀️ 日射量・受光SVGダイアグラム数値更新
-  const svgSolarEl = document.getElementById('svgSolarVal');
-  const svgLaiEl = document.getElementById('svgLaiVal');
-  const svgInterceptionEl = document.getElementById('svgInterceptionPct');
-  const svgAbsorbedEl = document.getElementById('svgAbsorbedSolar');
-
-  if (svgSolarEl) svgSolarEl.textContent = avgSolar.toFixed(1);
-  if (svgLaiEl) svgLaiEl.textContent = lai.toFixed(1);
-  if (svgInterceptionEl) svgInterceptionEl.textContent = (lightInterceptionFraction * 100).toFixed(0);
-  if (svgAbsorbedEl) svgAbsorbedEl.textContent = avgAbsorbedSolar.toFixed(2);
-
   // 4. 養分プログレスバー設定
   document.getElementById('barNVal').innerText = totalNKg.toFixed(2);
   document.getElementById('barPVal').innerText = totalPKg.toFixed(2);
@@ -356,14 +346,25 @@ async function calculateWaterAndFertilizer() {
   document.getElementById('barP').style.width = pWidth + '%';
   document.getElementById('barK').style.width = kWidth + '%';
 
-  // 5. テキスト情報
+  // 5. 📋 適用環境・設備データ（テーブル内テキスト更新）
   const tempSourceStr = inputTemp !== "" ? "手動指定" : (isApiSuccess ? `${intervalDays}日間予報平均` : "デフォルト");
-  document.getElementById('resSolar').innerText = `${avgSolar.toFixed(1)} (平均)`;
+  
+  document.getElementById('resSolar').innerText = avgSolar.toFixed(1);
+  document.getElementById('resSolarTotal').innerText = totalSolarSum.toFixed(1);
+  document.getElementById('resPAR').innerText = avgPar.toFixed(1);
+  document.getElementById('resPARTotal').innerText = totalParSum.toFixed(1);
+  
   document.getElementById('resTemp').innerText = avgTemp.toFixed(1);
   document.getElementById('sourceTemp').innerText = tempSourceStr;
   document.getElementById('resHum').innerText = finalHum.toFixed(1);
+  
   document.getElementById('resLAI').innerText = lai.toFixed(1);
+  document.getElementById('resAbsorbedRatio').innerText = Math.round(lightInterceptionFraction * 100);
+  
+  document.getElementById('resArea').innerText = houseArea.toLocaleString();
   document.getElementById('resTotalPlants').innerText = totalPlants.toLocaleString();
+  document.getElementById('resDensity').innerText = plantDensity.toFixed(2);
+  
   document.getElementById('resFlowRate').innerText = flowRate.toFixed(1);
 
   document.getElementById('output').style.display = 'block';
