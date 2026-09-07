@@ -156,7 +156,15 @@
   </div>
 
   <div class="card">
-    <h3>3. 気象パラメータ</h3>
+    <h3>3. 気象パラメータ (1日あたり手動指定時の設定)</h3>
+
+    <label>直達短波放射 (MJ/m²/日) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
+      <input type="number" step="0.1" id="manualDirectRad" placeholder="自動取得 (例: 9.0)">
+    </label>
+
+    <label>散乱短波放射 (MJ/m²/日) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
+      <input type="number" step="0.1" id="manualDiffuseRad" placeholder="自動取得 (例: 6.0)">
+    </label>
 
     <label>平均気温 (°C) <span class="note">※未指定時はOpen-Meteoから自動取得</span>:
       <input type="number" step="0.1" id="temperature" placeholder="自動取得">
@@ -213,25 +221,28 @@
       </div>
     </div>
 
-    <!-- ☀️ 日射量（Rs）・PAR・群落光吸収 ＆ 蒸散メカニズムSVG図 -->
+    <!-- ☀️ 日射量（Rs）・直達/散乱分離PAR・群落光吸収 ＆ 蒸散メカニズムSVG図 -->
     <div class="solar-visual-card">
-      <div class="solar-visual-title">☀️ 日射受光（短波放射 Rs / PAR）・群落光吸収モデル図</div>
-      <svg width="100%" height="150" viewBox="0 0 320 150">
+      <div class="solar-visual-title">☀️ 日射受光（直達・散乱分離PARモデル）・群落光吸収図</div>
+      <svg width="100%" height="160" viewBox="0 0 320 160">
         <!-- 太陽イラスト -->
         <circle cx="35" cy="30" r="16" fill="#ff9800"/>
         <circle cx="35" cy="30" r="20" fill="#ffc107" opacity="0.3"/>
-        <line x1="55" y1="25" x2="100" y2="25" stroke="#ff9800" stroke-width="2.5" stroke-dasharray="3,2"/>
-        <line x1="55" y1="45" x2="100" y2="55" stroke="#4caf50" stroke-width="2" stroke-dasharray="3,2"/>
+        <line x1="55" y1="20" x2="100" y2="20" stroke="#f57c00" stroke-width="2.5" stroke-dasharray="3,2"/>
+        <line x1="55" y1="45" x2="100" y2="55" stroke="#ffb74d" stroke-width="2" stroke-dasharray="3,2"/>
         
         <!-- 太陽・放射指標テキスト -->
-        <text x="35" y="62" font-size="8.5" text-anchor="middle" font-weight="bold" fill="#d48800">全天日射 (Rs)</text>
-        <text x="35" y="74" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#d48800"><tspan id="svgSolarVal">0.0</tspan> MJ/m²</text>
-        <text x="35" y="87" font-size="8.5" text-anchor="middle" font-weight="bold" fill="#2e7d32">PAR (光合成波長)</text>
-        <text x="35" y="99" font-size="9.5" text-anchor="middle" font-weight="bold" fill="#2e7d32"><tspan id="svgParVal">0.0</tspan> MJ/m²</text>
-        <text x="35" y="110" font-size="7.5" text-anchor="middle" fill="#888">(Rs × 48%)</text>
+        <text x="35" y="60" font-size="8" text-anchor="middle" font-weight="bold" fill="#d48800">全天日射 (Rs)</text>
+        <text x="35" y="72" font-size="9" text-anchor="middle" font-weight="bold" fill="#d48800"><tspan id="svgSolarVal">0.0</tspan> MJ/m²</text>
+        
+        <text x="35" y="86" font-size="8" text-anchor="middle" font-weight="bold" fill="#2e7d32">直達PAR (×0.43)</text>
+        <text x="35" y="97" font-size="8.5" text-anchor="middle" fill="#2e7d32"><tspan id="svgParDirect">0.0</tspan> MJ/m²</text>
+        
+        <text x="35" y="111" font-size="8" text-anchor="middle" font-weight="bold" fill="#2e7d32">散乱PAR (×0.57)</text>
+        <text x="35" y="122" font-size="8.5" text-anchor="middle" fill="#2e7d32"><tspan id="svgParDiffuse">0.0</tspan> MJ/m²</text>
 
         <!-- 葉群（群落消光モデル） -->
-        <g transform="translate(112, 22)">
+        <g transform="translate(112, 28)">
           <!-- 蒸散蒸気（青い点線矢印） -->
           <path d="M 25 10 Q 20 -5 25 -15" stroke="#00bcd4" stroke-width="2" fill="none" stroke-dasharray="2,2"/>
           <path d="M 40 10 Q 45 -5 40 -15" stroke="#00bcd4" stroke-width="2" fill="none" stroke-dasharray="2,2"/>
@@ -246,19 +257,19 @@
         </g>
 
         <!-- 変換矢印 -->
-        <path d="M 188 55 L 213 55" stroke="#00bcd4" stroke-width="2.5" fill="none"/>
-        <polygon points="213,51 221,55 213,59" fill="#00bcd4"/>
+        <path d="M 188 60 L 213 60" stroke="#00bcd4" stroke-width="2.5" fill="none"/>
+        <polygon points="213,56 221,60 213,64" fill="#00bcd4"/>
 
         <!-- 蒸散結果出力カード -->
-        <rect x="223" y="15" width="92" height="122" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+        <rect x="223" y="15" width="92" height="132" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
         <text x="269" y="32" font-size="10" font-weight="bold" fill="#006064" text-anchor="middle">🍃 群落蒸散量</text>
         <line x1="229" y1="38" x2="309" y2="38" stroke="#b2ebf2" stroke-width="1"/>
         <text x="269" y="54" font-size="13" font-weight="bold" fill="#00838f" text-anchor="middle"><tspan id="svgTranspirationM2">0.00</tspan> L/m²</text>
         <text x="269" y="68" font-size="8.5" fill="#555" text-anchor="middle">(ハウス: <tspan id="svgTranspirationTotal" font-weight="bold">0</tspan> L)</text>
         <line x1="229" y1="76" x2="309" y2="76" stroke="#b2ebf2" stroke-width="1"/>
-        <text x="269" y="90" font-size="8.5" fill="#006064" text-anchor="middle">吸収PARエネルギー:</text>
-        <text x="269" y="103" font-size="9.5" font-weight="bold" fill="#2e7d32" text-anchor="middle"><tspan id="svgAbsorbedPar">0.0</tspan> MJ/m²</text>
-        <text x="269" y="122" font-size="9" font-weight="bold" fill="#006064" text-anchor="middle"><tspan id="svgTranspirationPlant">0.00</tspan> L/株</text>
+        <text x="269" y="90" font-size="8.5" fill="#006064" text-anchor="middle">合計PAR / 吸収PAR:</text>
+        <text x="269" y="103" font-size="9" font-weight="bold" fill="#2e7d32" text-anchor="middle"><tspan id="svgParVal">0.0</tspan> / <tspan id="svgAbsorbedPar">0.0</tspan> MJ</text>
+        <text x="269" y="128" font-size="9" font-weight="bold" fill="#006064" text-anchor="middle"><tspan id="svgTranspirationPlant">0.00</tspan> L/株</text>
       </svg>
     </div>
 
@@ -333,12 +344,16 @@
       <table class="data-table">
         <tbody>
           <tr>
-            <th>短波放射 (Rs / 全天日射)</th>
-            <td><span id="resSolar">0.0</span> MJ/m² (<span id="resSolarTotal">0.0</span> MJ/m²/期間)</td>
+            <th>短波放射 (Rs / 直達・散乱)</th>
+            <td>直達 <span id="resDirectRs">0.0</span> + 散乱 <span id="resDiffuseRs">0.0</span> = 合計 <span id="resSolar">0.0</span> MJ/m²/日</td>
           </tr>
           <tr>
             <th>PAR (光合成有効放射)</th>
-            <td><span id="resPAR">0.0</span> MJ/m² (<span id="resPARTotal">0.0</span> MJ/m²/期間)</td>
+            <td>直達 <span id="resParDirect">0.0</span> + 散乱 <span id="resParDiffuse">0.0</span> = 合計 <span id="resPAR">0.0</span> MJ/m²/日</td>
+          </tr>
+          <tr>
+            <th>期間積算PAR / 吸収PAR</th>
+            <td>積算PAR <span id="resPARTotal">0.0</span> MJ/m² (吸収PAR <span id="resAbsorbedParTotal">0.0</span> MJ/m²)</td>
           </tr>
           <tr>
             <th>平均気温 / 湿度</th>
@@ -364,8 +379,8 @@
     <div class="info-box">
       <h4>💡 計算式の根拠・モデル仕様</h4>
       <ul>
-        <li><strong>短波放射 (Rs) と PAR (光合成有効放射):</strong><br>
-          大気トップ〜地表へ届く全天短波放射量（Rs）の約 <strong>48%</strong> を光合成に利用される波長域（400〜700nm）であるPARとして定義・換算しています。
+        <li><strong>直達光・散乱光分離PAR算定モデル:</strong><br>
+          短波放射量（Rs）を直達光と散乱光に分離し、それぞれの分光特性に基づき <code>直達光 × 0.43 ＋ 散乱光 × 0.57</code> としてPAR（光合成有効放射波長 400〜700nm）を算定しています。
         </li>
         <li><strong>受光量・蒸散計算（光の吸収モデル）:</strong><br>
           消光係数 0.7 と LAI から群落受光率（<code>1 - e^(-0.7 × LAI)</code>）を求め、吸収短波放射エネルギーに対し、基本蒸散効率 <strong>1 MJ あたり 0.35 L/m²</strong> を基準に計算。
@@ -385,6 +400,10 @@
         本アプリの算出アルゴリズムは、植物生理学および施設園芸分野で確立された**既存の学術研究モデルおよび公的機関の栽培指針の数式をコード化して利用**しています。
       </p>
       <ul style="padding-left: 18px; margin: 8px 0 0 0; line-height: 1.6;">
+        <li>
+          <strong>PAR・大気透過モデル:</strong> 
+          太陽放射の分光組成特性（直達波長: 43%、散乱波長: 57%）に基づき光合成有効放射を分離計算。
+        </li>
         <li>
           <strong>受光量モデル:</strong> 
           <a href="https://academic.oup.com/aob/article/95/3/483/322905" target="_blank" rel="noopener noreferrer">
