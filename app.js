@@ -32,7 +32,6 @@ function getCurrentLocation() {
 
 // 計算メイン処理
 async function calculateWaterAndFertilizer() {
-  // 密度の最新化
   updatePlantDensity();
 
   const lat = document.getElementById('lat').value;
@@ -41,6 +40,7 @@ async function calculateWaterAndFertilizer() {
   const totalPlants = parseFloat(document.getElementById('totalPlantsInput').value);
   const plantDensity = parseFloat(document.getElementById('plantDensity').value);
   const lai = parseFloat(document.getElementById('lai').value);
+  const fertilizerType = document.getElementById('fertilizerType').value;
 
   let inputTemp = document.getElementById('temperature').value;
   let inputHum = document.getElementById('humidity').value;
@@ -71,7 +71,6 @@ async function calculateWaterAndFertilizer() {
   let fetchedHum = 65.0;
 
   try {
-    // Open-Meteo API呼び出し (パラメータを明確に指定)
     const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=shortwave_radiation_sum,temperature_2m_mean&forecast_days=1&timezone=auto`;
     const response = await fetch(apiUrl);
     
@@ -110,8 +109,8 @@ async function calculateWaterAndFertilizer() {
   // 1株あたりの潅水量 (L/株)
   const waterPerPlant = baseWaterPerM2 / plantDensity;
 
-  // 1株あたりの施肥量 (g/株)
-  const nPerPlant = waterPerPlant * 0.15;
+  // 1株あたりの施肥量 (純成分 g/株)
+  const nPerPlant = waterPerPlant * 0.15; // N 150ppm基準
   const pPerPlant = waterPerPlant * 0.04;
   const kPerPlant = waterPerPlant * 0.20;
 
@@ -119,9 +118,23 @@ async function calculateWaterAndFertilizer() {
   const totalWaterL = baseWaterPerM2 * houseArea;     // 総潅水量 (L)
   const totalWaterTon = totalWaterL / 1000;           // 総潅水量 (t/m³)
 
-  const totalNKg = (nPerPlant * totalPlants) / 1000;  // 総窒素量 (kg)
-  const totalPKg = (pPerPlant * totalPlants) / 1000;  // 総リン酸量 (kg)
-  const totalKKg = (kPerPlant * totalPlants) / 1000;  // 総カリウム量 (kg)
+  const totalNKg = (nPerPlant * totalPlants) / 1000;  // 総窒素成分量 (kg)
+  const totalPKg = (pPerPlant * totalPlants) / 1000;  // 総リン酸成分量 (kg)
+  const totalKKg = (kPerPlant * totalPlants) / 1000;  // 総カリ成分量 (kg)
+
+  // --- 【液肥使用量計算 (N基準換算)】 ---
+  let nPercent = 0.10; // トミー液肥ブラック default
+  let fertName = "トミー液肥ブラック";
+  
+  if (fertilizerType === "green") {
+    nPercent = 0.06; // トミー液肥グリーン
+    fertName = "トミー液肥グリーン";
+  }
+
+  const densityFert = 1.2; // 液肥の概算比重 (kg/L)
+  const fertRequiredKg = totalNKg / nPercent; // 必要液肥量 (kg)
+  const fertRequiredL = fertRequiredKg / densityFert; // 必要液肥量 (L)
+  const dilutionRatio = Math.round(totalWaterL / fertRequiredL); // 希釈倍率
 
   // --- 画面描画 ---
   document.getElementById('resSolar').innerText = solarRadiationSum.toFixed(2);
@@ -146,11 +159,17 @@ async function calculateWaterAndFertilizer() {
   document.getElementById('resTotalP').innerText = totalPKg.toFixed(2);
   document.getElementById('resTotalK').innerText = totalKKg.toFixed(2);
 
+  // 液肥計算結果
+  document.getElementById('resFertName').innerText = fertName;
+  document.getElementById('resFertL').innerText = fertRequiredL.toFixed(1);
+  document.getElementById('resFertKg').innerText = fertRequiredKg.toFixed(1);
+  document.getElementById('resDilution').innerText = dilutionRatio.toLocaleString();
+
   // 結果表示
   document.getElementById('output').style.display = 'block';
 }
 
-// ページ読み込み完了時に自動計算を実行
+// 初期ロード処理
 document.addEventListener('DOMContentLoaded', () => {
   updatePlantDensity();
 });
