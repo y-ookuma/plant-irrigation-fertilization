@@ -4,16 +4,42 @@
   <meta charset="UTF-8">
   <title>LAI潅水・施肥モデル</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="styles.css">
+
+  <!-- D3.js -->
   <script src="d3.min.js"></script>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <h2>LAI → 潅水量 → NPK施肥モデル</h2>
 
-  気温(℃): <input id="temp" type="number" placeholder="未入力なら屋外値"><br>
-  湿度(%): <input id="rh" type="number" placeholder="未入力なら屋外値"><br>
-  株数/m2: <input id="density" type="number" value="2.5"><br>
-  面積m2/株: <input id="area" type="number" value="0.30"><br>
+  <label>作物:</label>
+  <select id="crop">
+    <option value="cucumber">キュウリ</option>
+    <option value="tomato">トマト</option>
+    <option value="pepper">ピーマン</option>
+    <option value="strawberry">イチゴ</option>
+  </select>
+
+  <br><br>
+
+  <label>気温(℃):</label>
+  <input id="temp" type="number" placeholder="未入力なら屋外値">
+
+  <label>湿度(%):</label>
+  <input id="rh" type="number" placeholder="未入力なら屋外値">
+
+  <br><br>
+
+  <label>株数/m2:</label>
+  <input id="density" type="number" value="2.5">
+
+  <label>面積m2/株:</label>
+  <input id="area" type="number" value="0.30">
+
+  <br><br>
 
   <button id="calcGraph">計算＆グラフ表示</button>
 
@@ -31,6 +57,9 @@
   <h3>NPK複合グラフ</h3>
   <svg id="graphNPK"></svg>
 
+  <h3>収量予測（kg/株/day）</h3>
+  <svg id="graphYield"></svg>
+
   <h3>NPK施肥量（g/株/day）</h3>
   <table id="npkTable">
     <thead>
@@ -42,6 +71,7 @@
   <button id="csvBtn">NPK CSV保存</button>
   <button id="pngBtn">NPKグラフ PNG保存</button>
 
+  <!-- app.js を module として読み込む -->
   <script type="module" src="app.js"></script>
 </body>
 </html>
