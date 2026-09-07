@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>キュウリ潅水・施肥計算アプリ</title>
+  <title>キュウリ 潅水・施肥量計算機</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 680px; margin: 20px auto; padding: 15px; line-height: 1.5; color: #333; background-color: #f4f7f6; }
@@ -55,7 +55,6 @@
     .info-box ul { padding-left: 20px; margin-bottom: 0; }
     .academic-box { background: #eef6fc; border: 1px solid #b8daff; border-radius: 6px; padding: 15px; margin-top: 15px; font-size: 0.85em; color: #004085; }
     .academic-box h4 { margin: 0 0 8px 0; color: #0056b3; display: flex; align-items: center; gap: 5px; }
-    .academic-box a { color: #0056b3; text-decoration: underline; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -288,17 +287,18 @@
     </div>
 
     <div class="info-box">
-      <h4>💡 計算式の根拠・モデル仕様</h4>
+      <h4>💡 計算式の根拠・モデル仕様と学術的背景</h4>
       <ul>
-        <li><strong>PAR算定モデル:</strong> 短波放射量（Rs）から光合成有効放射（PAR）を算出（分離モデルまたは換算係数適用）。</li>
-        <li><strong>受光量・蒸散計算:</strong> 消光係数 0.7 と LAI から群落受光率を求め、吸収短波放射エネルギーに対し基本蒸散効率 <strong>1 MJ あたり 0.35 L/m²</strong> を基準に計算。</li>
-        <li><strong>気象補正:</strong> 25℃超過時 1℃あたり <strong>2%増量</strong> / 湿度50%未満時 1%低下あたり <strong>0.5%増量</strong>。</li>
+        <li><strong>PAR算定モデル:</strong> 短波放射量（Rs / GHI）を大気光学特性に基づき直達光成分（43%）と散乱光成分（57%）へ分離。それぞれ固有の分光特性係数を乗じて高精度にPARを算出します。</li>
+        <li><strong>群落受光モデル（モンシ・サエキの理論）:</strong> 栽培植物の群落内における光の減衰を表現するランベルト・ベールの法則（Monsi & Saeki, 1953）に準拠。消光係数 k = 0.7 と葉面積指数（LAI）から群落受光率を動的に算出し、受光エネルギーを導出します。</li>
+        <li><strong>蒸散量・気象補正モデル:</strong> 吸収された光エネルギーに対する標準的な水分蒸散効率（基本係数: 0.35 L/m²/MJ）をベースに、FAO-56 基準蒸発散モデル（Penman-Monteith式）の概念を応用。平均気温 25°C 超過時や低湿度（50% 未満）環境下における蒸散亢進ストレスをリアルタイムに補正します。</li>
+        <li><strong>施肥・養分収支モデル（農研機構準拠）:</strong> 農研機構の施設園芸・養水分管理に関する研究成果および技術マニュアルに基づき、標準給液濃度設計から総必要肥料量を算出し、キュウリ果実の乾物率（4.0%）および主要成分含有率（N: 3.0%, P: 1.0%, K: 4.5%）に基づく収穫物の養分持ち出し量を差し引いた正確な養分収支を計算します。</li>
       </ul>
     </div>
 
     <div class="academic-box">
       <h4>📘 本プログラムの学術・技術的根拠について</h4>
-      <p style="margin: 4px 0;">本アプリは**モンシ・サエキの群落消光理論（Monsi & Saeki, 1953）**および**FAO-56 基準蒸発散モデル**に準拠しています。</p>
+      <p style="margin: 4px 0;">本アプリのコアロジックは、植物生理学の礎である Monsi & Saeki (1953) の群落光合成・受光理論、国連食糧農業機関（FAO）の FAO-56 基準蒸発散モデル、および<strong>農研機構の施設園芸における養水分管理・施肥基準に関する研究成果</strong>に依拠しています。実際の施設園芸における物質生産と水分消費のダイナミクスに即した実用的な設計を行っています。</p>
     </div>
   </div>
 
