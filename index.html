@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>キュウリ潅水・施肥計算アプリ (ハウス面積対応)</title>
+  <title>キュウリ潅水・施肥計算アプリ</title>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 15px; line-height: 1.5; }
     .card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fafafa; }
     label { display: block; margin-top: 10px; font-weight: bold; }
     input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    input[readonly] { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
     button { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 15px; }
     button:hover { background: #218838; }
     .result { background: #e9f7ef; border-left: 5px solid #28a745; padding: 15px; margin-top: 20px; }
     .note { font-size: 0.85em; color: #666; font-weight: normal; }
-    .highlight { font-weight: bold; color: #155724; }
+    .highlight { font-weight: bold; color: #155724; font-size: 1.1em; }
   </style>
 </head>
 <body>
@@ -35,11 +36,15 @@
     <h3>2. 栽培パラメータ</h3>
     
     <label>ハウス面積 (m²):
-      <input type="number" step="1" id="houseArea" value="1000" required>
+      <input type="number" step="1" id="houseArea" value="1000" oninput="updatePlantDensity()" required>
     </label>
 
-    <label>株数 (本/m²):
-      <input type="number" step="0.1" id="plantDensity" value="3.0" required>
+    <label>総株数 (本):
+      <input type="number" step="1" id="totalPlantsInput" value="3000" oninput="updatePlantDensity()" required>
+    </label>
+
+    <label>株数密度 (本/m²) <span class="note">※自動計算</span>:
+      <input type="number" id="plantDensity" value="3.0" readonly>
     </label>
 
     <label>LAI (葉面積指数 m²/m²) <span class="note">※育苗期: 0.5〜1.0 / 収穫期: 3.0〜4.5</span>:
@@ -69,7 +74,7 @@
       <li>気温: <span id="resTemp"></span> °C (<span id="sourceTemp"></span>)</li>
       <li>湿度: <span id="resHum"></span> % (<span id="sourceHum"></span>)</li>
       <li>LAI: <span id="resLAI"></span></li>
-      <li>総株数 (推定): <span id="resTotalPlants"></span> 株</li>
+      <li>総株数: <span id="resTotalPlants"></span> 株</li>
     </ul>
 
     <p><strong>【単位面積・1株あたり管理量 (1日)】</strong></p>
