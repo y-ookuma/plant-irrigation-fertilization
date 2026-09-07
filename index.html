@@ -5,16 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>キュウリ潅水・施肥計算アプリ</title>
   <style>
-    body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 15px; line-height: 1.5; }
+    body { font-family: sans-serif; max-width: 650px; margin: 20px auto; padding: 15px; line-height: 1.5; color: #333; }
     .card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fafafa; }
     label { display: block; margin-top: 10px; font-weight: bold; }
-    input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    input, select { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
     input[readonly] { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
     button { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 15px; }
     button:hover { background: #218838; }
     .result { background: #e9f7ef; border-left: 5px solid #28a745; padding: 15px; margin-top: 20px; }
     .note { font-size: 0.85em; color: #666; font-weight: normal; }
     .highlight { font-weight: bold; color: #155724; font-size: 1.1em; border-top: 1px solid #c3e6cb; padding-top: 10px; margin-top: 15px; }
+    .info-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-top: 20px; font-size: 0.9em; }
+    .info-box h4 { margin-top: 0; color: #495057; border-bottom: 2px solid #28a745; padding-bottom: 5px; }
+    .info-box ul { padding-left: 20px; margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -50,6 +53,13 @@
     <label>LAI (葉面積指数 m²/m²) <span class="note">※育苗期: 0.5〜1.0 / 収穫期: 3.0〜4.5</span>:
       <input type="number" step="0.1" id="lai" value="3.5" required>
     </label>
+
+    <label>使用液肥銘柄:
+      <select id="fertilizerType">
+        <option value="black">トミー液肥ブラック (N:10% - P:4% - K:6%)</option>
+        <option value="green">トミー液肥グリーン (N:6% - P:8% - K:8%)</option>
+      </select>
+    </label>
   </div>
 
   <div class="card">
@@ -80,7 +90,7 @@
     <p><strong>【単位面積・1株あたり管理量 (1日)】</strong></p>
     <ul>
       <li><strong>必要潅水量:</strong> <span id="resWaterM2"></span> L/m² (<span id="resWaterPlant"></span> L/株)</li>
-      <li><strong>1株あたり施肥目安量:</strong>
+      <li><strong>1株あたり施肥目安量 (成分量):</strong>
         <ul>
           <li>窒素 (N): <span id="resN"></span> g/株</li>
           <li>リン酸 (P): <span id="resP"></span> g/株</li>
@@ -92,14 +102,39 @@
     <p class="highlight"><strong>【ハウス全体での1日合計管理量】</strong></p>
     <ul>
       <li><strong>総潅水量:</strong> <span id="resTotalWaterL"></span> L (<span id="resTotalWaterTon"></span> m³/t)</li>
-      <li><strong>総施肥量:</strong>
+      <li><strong>総施肥量 (純成分量):</strong>
         <ul>
           <li>窒素 (N): <span id="resTotalN"></span> kg</li>
           <li>リン酸 (P): <span id="resTotalP"></span> kg</li>
           <li>カリウム (K): <span id="resTotalK"></span> kg</li>
         </ul>
       </li>
+      <li><strong>選択液肥使用量 (<span id="resFertName"></span>):</strong>
+        <ul>
+          <li>必要液肥量: <strong style="color: #155724;"><span id="resFertL"></span> L</strong> （約 <span id="resFertKg"></span> kg）</li>
+          <li>希釈倍率目安: 約 <span id="resDilution"></span> 倍（潅水量に対して）</li>
+        </ul>
+      </li>
     </ul>
+
+    <!-- 根拠解説インフォメーション -->
+    <div class="info-box">
+      <h4>💡 計算式の根拠・モデル仕様</h4>
+      <ul>
+        <li><strong>受光量・蒸散計算（Beer-Lambertの法則）:</strong><br>
+          群落の受光率を $1 - e^{-k \cdot \text{LAI}}$ （消光係数 $k=0.7$）で算出し、日射量（MJ/m²）と掛け合わせて有効受光エネルギーを決定します。基本蒸散効率として $1\,\text{MJ}$ あたり $0.35\,\text{L/m²}$ を基準としています。
+        </li>
+        <li><strong>気象補正（VPD応答）:</strong><br>
+          日平均気温が $25^\circ\text{C}$ を超える場合は $1^\circ\text{C}$ あたり $2\%$&thinsp;増量、平均湿度が $50\%$ を下回る（乾燥）場合は $1\%$ 低下あたり $0.5\%$&thinsp;増量の補正を行っています。
+        </li>
+        <li><strong>施肥濃度（N基準）:</strong><br>
+          養液土耕における標準的な施肥基準（N濃度約 $150\,\text{ppm} = 0.15\,\text{g/L}$）を適用しています。
+        </li>
+        <li><strong>液肥換算:</strong><br>
+          選択した液肥の窒素（N）保証成分量をもとに、目標窒素量を補うために必要な液肥原液の量（L・kg）を算出しています（比重は $1.2\,\text{g/mL}$ として計算）。
+        </li>
+      </ul>
+    </div>
   </div>
 
   <script src="app.js"></script>
