@@ -102,8 +102,17 @@
     <label>総株数 (本):
       <input type="number" step="1" id="totalPlantsInput" value="3000" oninput="updatePlantDensity()" onchange="updatePlantDensity()" required>
     </label>
-    <label>株数密度 (本/m²) <span class="note">※自動計算</span>:
-      <input type="number" id="plantDensity" value="3.00" readonly>
+    <label>株数密度 <span class="note">※自動計算</span>:
+      <div style="display: flex; gap: 10px; margin-top: 5px;">
+        <div style="flex: 1;">
+          <span style="font-size: 0.85em; color: #495057; font-weight: normal;">m²あたり:</span>
+          <input type="number" id="plantDensity" value="3.00" readonly style="margin-top: 2px;">
+        </div>
+        <div style="flex: 1;">
+          <span style="font-size: 0.85em; color: #495057; font-weight: normal;">坪あたり:</span>
+          <input type="number" id="plantDensityTsubo" value="9.92" readonly style="margin-top: 2px;">
+        </div>
+      </div>
     </label>
     <label>設備潅水量 (L/分):
       <input type="number" step="0.1" id="flowRate" value="50.0" required>
