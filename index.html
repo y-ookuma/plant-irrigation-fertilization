@@ -289,7 +289,12 @@
     </div>
 
     <div style="background:#fff; border:1px solid #e0e0e0; padding:15px; border-radius:8px; margin-bottom:15px;">
-      <div style="font-weight:bold; margin-bottom:10px; color:#2c3e50;">🌱 給液中の養成分バランス目安 (ハウス全体1回分)</div>
+      <div style="font-weight:bold; margin-bottom:10px; color:#2c3e50; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <span>🌱 給液中の養成分バランス目安 (ハウス全体1回分)</span>
+        <span style="font-size: 0.85em; font-weight: normal; color: #555;">
+          （使用液肥: <strong id="barFertNameDisplay">--</strong> / <strong id="barFertLDisplay">0.0</strong> L）
+        </span>
+      </div>
       <div class="bar-container">
         <div class="bar-label"><span>窒素 (N)</span><span><strong id="barNVal">0</strong> kg</span></div>
         <div class="progress-bg"><div id="barN" class="progress-fill fill-n" style="width: 100%;"></div></div>
