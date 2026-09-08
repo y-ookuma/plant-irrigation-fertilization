@@ -43,7 +43,6 @@ function exportParamsJSON() {
     humidity: document.getElementById('humidity').value
   };
 
-  // スマホ対応として Blob オブジェクトを使用
   const jsonString = JSON.stringify(params, null, 2);
   const blob = new Blob([jsonString], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -227,7 +226,8 @@ async function calculateWaterAndFertilizer() {
     nRatio = 0.15; pRatio = 0.08; kRatio = 0.17;
   }
 
-  const targetSupplyN = (totalPlants * intervalDays * 0.65 / 1000) * Math.max(0.8, avgSolar / 14);
+  const solarFertFactor = Math.max(0.8, avgSolar / 14);
+  const targetSupplyN = (totalPlants * intervalDays * 0.65 / 1000) * solarFertFactor;
   const totalFertKg = targetSupplyN / nRatio;
   const totalFertL = totalFertKg / fertDensityKgL;
   const dilutionRatio = totalWaterL > 0 && totalFertL > 0 ? Math.round(totalWaterL / totalFertL) : 1000;
@@ -246,6 +246,7 @@ async function calculateWaterAndFertilizer() {
   const nExportRatio = supplyN > 0 ? Math.round((outN / supplyN) * 100) : 0;
   const diffN = supplyN - outN;
 
+  // DOM反映：カード・テーブル・バランス等
   document.getElementById('cardTotalTranspirationL').textContent = Math.round(totalTranspirationL).toLocaleString();
   document.getElementById('cardTranspirationM2').textContent = transpirationM2.toFixed(1);
   document.getElementById('cardTranspirationPlant').textContent = transpirationPlant.toFixed(2);
@@ -263,6 +264,7 @@ async function calculateWaterAndFertilizer() {
   document.getElementById('cardDryMatter').textContent = dryMatterKg.toFixed(1);
   document.getElementById('cardHarvestKg').textContent = plannedHarvestKg.toFixed(1);
 
+  // SVGビジュアル（日射・PAR・蒸散・液肥根拠）への反映
   document.getElementById('svgSolarVal').textContent = avgSolar.toFixed(1);
   document.getElementById('svgParVal').textContent = avgPar.toFixed(1);
   document.getElementById('svgLaiVal').textContent = lai.toFixed(1);
@@ -271,6 +273,13 @@ async function calculateWaterAndFertilizer() {
   document.getElementById('svgTranspirationTotal').textContent = Math.round(totalTranspirationL).toLocaleString();
   document.getElementById('svgAbsorbedPar').textContent = absorbedParTotal.toFixed(1);
   document.getElementById('svgTranspirationPlant').textContent = transpirationPlant.toFixed(2);
+
+  // 追加した「選択液肥使用量の根拠」の各要素への反映
+  document.getElementById('svgFertSolarFactor').textContent = solarFertFactor.toFixed(2);
+  document.getElementById('svgFertTargetN').textContent = targetSupplyN.toFixed(2);
+  document.getElementById('svgFertNameBadge').textContent = fertName;
+  document.getElementById('svgFertResultKg').textContent = totalFertKg.toFixed(1);
+  document.getElementById('svgFertResultL').textContent = totalFertL.toFixed(1);
 
   document.getElementById('balanceFertLabel').textContent = fertName;
   document.getElementById('balSupplyN').textContent = supplyN.toFixed(2);
