@@ -7,6 +7,7 @@
 // 初期化処理
 document.addEventListener('DOMContentLoaded', () => {
   updatePlantDensity();
+  autoFetchLocation();
 });
 
 /**
@@ -28,39 +29,70 @@ function updatePlantDensity() {
 }
 
 /**
- * 現在地（ブラウザのGeolocation API）を取得して緯度経度フォームに設定し、逆ジオコーディングで地名を表示する
+ * ページ読み込み時に現在地（ブラウザのGeolocation API）を自動取得し、
+ * 内部の緯度経度（非表示項目）に設定するとともに、座標と地名（市区町村・大字まで）を画面に表示する。
+ * 入力や取得ボタンは提供せず、常に自動取得のみで完結する。
  */
-function getCurrentLocation() {
+function autoFetchLocation() {
+  const coordsEl = document.getElementById('locationCoords');
+  const nameEl = document.getElementById('locationName');
+
   if (!navigator.geolocation) {
-    alert("お使いのブラウザは位置情報取得に対応していません。");
+    const lat = document.getElementById('lat').value;
+    const lon = document.getElementById('lon').value;
+    coordsEl.textContent = `📍 座標: 緯度 ${lat} / 経度 ${lon} (取得非対応・既定値使用)`;
+    nameEl.textContent = "地名: お使いのブラウザは位置情報取得に対応していません（既定値: 東京都）";
     return;
   }
+
   navigator.geolocation.getCurrentPosition(
     async (position) => {
       const lat = position.coords.latitude;
       const lon = position.coords.longitude;
-      document.getElementById('lat').value = lat.toFixed(4);
-      document.getElementById('lon').value = lon.toFixed(4);
+      document.getElementById('lat').value = lat.toFixed(6);
+      document.getElementById('lon').value = lon.toFixed(6);
+      coordsEl.textContent = `📍 座標: 緯度 ${lat.toFixed(4)} / 経度 ${lon.toFixed(4)}`;
 
-      // 逆ジオコーディングAPI（Nominatim）を使用して地名を取得
+      // 逆ジオコーディングAPI（Nominatim）を使用して地名（市区町村・大字相当まで）を取得
       try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ja`);
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1&accept-language=ja`);
         if (response.ok) {
           const data = await response.json();
-          const placeName = data.display_name || "取得した座標周辺";
-          document.getElementById('locationName').textContent = `地名: ${placeName}`;
+          const placeName = formatPlaceNameToOaza(data.address);
+          nameEl.textContent = `地名: ${placeName || "取得した座標周辺"}`;
         } else {
-          document.getElementById('locationName').textContent = "地名: 取得に失敗しました";
+          nameEl.textContent = "地名: 取得に失敗しました";
         }
       } catch (err) {
         console.warn("逆ジオコーディング取得エラー:", err);
-        document.getElementById('locationName').textContent = "地名: 取得エラー";
+        nameEl.textContent = "地名: 取得エラー";
       }
     },
     (error) => {
-      alert("位置情報の取得に失敗しました: " + error.message);
+      const lat = document.getElementById('lat').value;
+      const lon = document.getElementById('lon').value;
+      coordsEl.textContent = `📍 座標: 緯度 ${lat} / 経度 ${lon} (取得失敗・既定値使用)`;
+      nameEl.textContent = `地名: 位置情報の取得に失敗しました（${error.message}）既定値（東京都）を使用します`;
     }
   );
+}
+
+/**
+ * Nominatimの住所要素（addressdetails）から「都道府県＋市区町村＋大字（字・字相当）」までの地名を組み立てる。
+ * 丁目・番地・道路名・建物名などそれ以降の詳細情報は含めない。
+ */
+function formatPlaceNameToOaza(address) {
+  if (!address) return "";
+  const parts = [];
+  if (address.state) parts.push(address.state);
+
+  const cityLevel = address.city || address.town || address.village || address.city_district;
+  if (cityLevel) parts.push(cityLevel);
+
+  const oazaLevel = address.suburb || address.neighbourhood || address.hamlet || address.quarter;
+  if (oazaLevel && oazaLevel !== cityLevel) parts.push(oazaLevel);
+
+  return parts.join('');
 }
 
 /**
@@ -178,29 +210,64 @@ async function calculateWaterAndFertilizer() {
     let avgHum = 70.0;
     let sourceTempLabel = "Open-Meteo予測平均";
 
+    // 潅水(日分)ぶんの日付リストをあらかじめ作成（後でAPI側の日付に置き換わる場合あり）
+    const dateList = [];
+    for (let i = 0; i < intervalDays; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      dateList.push(formatDateISO(d));
+    }
+
+    let solarDaily = [];
+    let tempDaily = [];
+    let humDaily = [];
+
     // 手動入力値があれば優先、なければOpen-Meteoから取得
     if (manualSolar !== "" && manualTemp !== "" && manualHum !== "") {
       avgSolar = parseFloat(manualSolar);
       avgTemp = parseFloat(manualTemp);
       avgHum = parseFloat(manualHum);
       sourceTempLabel = "手動指定値";
+      solarDaily = dateList.map(() => avgSolar);
+      tempDaily = dateList.map(() => avgTemp);
+      humDaily = dateList.map(() => avgHum);
     } else {
       try {
         const dailyData = await fetchWeatherForecast(lat, lon, startDateStr, endDateStr);
         if (dailyData && dailyData.shortwave_radiation_sum && dailyData.shortwave_radiation_sum.length > 0) {
-          const solars = dailyData.shortwave_radiation_sum.filter(v => v !== null);
-          const temps = dailyData.temperature_2m_mean.filter(v => v !== null);
-          const hums = dailyData.relative_humidity_2m_mean.filter(v => v !== null);
+          const convertSolar = (v) => (v !== null && v > 1000) ? v / 1000000 : v;
+
+          solarDaily = dailyData.shortwave_radiation_sum.map(v => v !== null ? convertSolar(v) : null);
+          tempDaily = dailyData.temperature_2m_mean.map(v => v !== null ? v : null);
+          humDaily = dailyData.relative_humidity_2m_mean.map(v => v !== null ? v : null);
+
+          const solars = solarDaily.filter(v => v !== null);
+          const temps = tempDaily.filter(v => v !== null);
+          const hums = humDaily.filter(v => v !== null);
 
           if (solars.length > 0) avgSolar = solars.reduce((a, b) => a + b, 0) / solars.length;
-          if (avgSolar > 1000) avgSolar = avgSolar / 1000000; 
-
           if (temps.length > 0) avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
           if (hums.length > 0) avgHum = hums.reduce((a, b) => a + b, 0) / hums.length;
+
+          // 欠測日は期間平均値で補完（表示・計算breakdown用）
+          solarDaily = solarDaily.map(v => v !== null ? v : avgSolar);
+          tempDaily = tempDaily.map(v => v !== null ? v : avgTemp);
+          humDaily = humDaily.map(v => v !== null ? v : avgHum);
+
+          if (dailyData.time && dailyData.time.length === dateList.length) {
+            for (let i = 0; i < dateList.length; i++) dateList[i] = dailyData.time[i];
+          }
+        } else {
+          solarDaily = dateList.map(() => avgSolar);
+          tempDaily = dateList.map(() => avgTemp);
+          humDaily = dateList.map(() => avgHum);
         }
       } catch (err) {
         console.warn("気象API取得エラーのためデフォルト値を使用します: ", err.message);
         sourceTempLabel = "通信エラー(デフォルト値使用)";
+        solarDaily = dateList.map(() => avgSolar);
+        tempDaily = dateList.map(() => avgTemp);
+        humDaily = dateList.map(() => avgHum);
       }
     }
 
@@ -209,6 +276,10 @@ async function calculateWaterAndFertilizer() {
     const k = 0.7; // 消光係数
     const absorbedRatio = (1 - Math.exp(-k * lai)) * 100; // 受光率 (%)
     const absorbedPar = parTotal * (absorbedRatio / 100);
+
+    // 潅水(日分)の日数ぶん、日付ごとのPAR・吸収PARを算出（表示用）
+    const parDaily = solarDaily.map(v => v * 0.48);
+    const absorbedParDaily = parDaily.map(v => v * (absorbedRatio / 100));
 
     // 3. 蒸散量計算
     let tempStressFactor = 1.0;
@@ -328,6 +399,23 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('resTemp').textContent = avgTemp.toFixed(1);
     document.getElementById('sourceTemp').textContent = sourceTempLabel;
     document.getElementById('resHum').textContent = avgHum.toFixed(1);
+
+    // 潅水(日分)の日数ぶん、日付ごとの内訳を表示
+    document.getElementById('resSolarDaily').innerHTML = dateList
+      .map((d, i) => `${formatDateShort(d)}: ${solarDaily[i].toFixed(1)} MJ/m²/日`)
+      .join('<br>');
+
+    document.getElementById('resPARDaily').innerHTML = dateList
+      .map((d, i) => `${formatDateShort(d)}: ${parDaily[i].toFixed(1)} MJ/m²/日`)
+      .join('<br>');
+
+    document.getElementById('resParTotalDaily').innerHTML = dateList
+      .map((d, i) => `${formatDateShort(d)}: PAR ${parDaily[i].toFixed(1)} MJ/m² (吸収PAR ${absorbedParDaily[i].toFixed(1)} MJ/m²)`)
+      .join('<br>');
+
+    document.getElementById('resTempHumDaily').innerHTML = dateList
+      .map((d, i) => `${formatDateShort(d)}: ${tempDaily[i].toFixed(1)} °C / ${humDaily[i].toFixed(1)} %`)
+      .join('<br>');
     document.getElementById('resLAI').textContent = lai.toFixed(1);
     document.getElementById('resAbsorbedRatio').textContent = Math.round(absorbedRatio);
     document.getElementById('resArea').textContent = houseArea.toLocaleString();
@@ -352,6 +440,17 @@ function formatMinutesToTime(totalMinutes) {
     return `${hours}時間 ${minutes}分`;
   }
   return `${minutes}分`;
+}
+
+/**
+ * "YYYY-MM-DD" 形式の日付文字列を "M/D" 形式の短い表示用文字列に変換する
+ */
+function formatDateShort(dateStr) {
+  const parts = String(dateStr).split('-');
+  if (parts.length === 3) {
+    return `${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}`;
+  }
+  return dateStr;
 }
 
 function formatDateISO(date) {
