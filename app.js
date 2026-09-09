@@ -28,7 +28,7 @@ function updatePlantDensity() {
 }
 
 /**
- * 現在地（ブラウザのGeolocation API）を取得して緯度経度フォームに設定する
+ * 現在地（ブラウザのGeolocation API）を取得して緯度経度フォームに設定し、逆ジオコーディングで地名を表示する
  */
 function getCurrentLocation() {
   if (!navigator.geolocation) {
@@ -36,14 +36,38 @@ function getCurrentLocation() {
     return;
   }
   navigator.geolocation.getCurrentPosition(
-    (position) => {
-      document.getElementById('lat').value = position.coords.latitude.toFixed(4);
-      document.getElementById('lon').value = position.coords.longitude.toFixed(4);
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      document.getElementById('lat').value = lat.toFixed(4);
+      document.getElementById('lon').value = lon.toFixed(4);
+
+      // 逆ジオコーディングAPI（Nominatim）を使用して地名を取得
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ja`);
+        if (response.ok) {
+          const data = await response.json();
+          const placeName = data.display_name || "取得した座標周辺";
+          document.getElementById('locationName').textContent = `地名: ${placeName}`;
+        } else {
+          document.getElementById('locationName').textContent = "地名: 取得に失敗しました";
+        }
+      } catch (err) {
+        console.warn("逆ジオコーディング取得エラー:", err);
+        document.getElementById('locationName').textContent = "地名: 取得エラー";
+      }
     },
     (error) => {
       alert("位置情報の取得に失敗しました: " + error.message);
     }
   );
+}
+
+/**
+ * ファイル選択ダイアログをプログラムから起動する
+ */
+function triggerImportJSON() {
+  document.getElementById('jsonFileInput').click();
 }
 
 /**
@@ -53,6 +77,7 @@ function exportParamsJSON() {
   const params = {
     lat: document.getElementById('lat').value,
     lon: document.getElementById('lon').value,
+    locationName: document.getElementById('locationName').textContent,
     houseArea: document.getElementById('houseArea').value,
     totalPlants: document.getElementById('totalPlantsInput').value,
     flowRate: document.getElementById('flowRate').value,
@@ -87,6 +112,7 @@ function importParamsJSON(event) {
       const data = JSON.parse(e.target.result);
       if (data.lat !== undefined) document.getElementById('lat').value = data.lat;
       if (data.lon !== undefined) document.getElementById('lon').value = data.lon;
+      if (data.locationName !== undefined) document.getElementById('locationName').textContent = data.locationName;
       if (data.houseArea !== undefined) document.getElementById('houseArea').value = data.houseArea;
       if (data.totalPlants !== undefined) document.getElementById('totalPlantsInput').value = data.totalPlants;
       if (data.flowRate !== undefined) document.getElementById('flowRate').value = data.flowRate;
@@ -167,7 +193,6 @@ async function calculateWaterAndFertilizer() {
           const hums = dailyData.relative_humidity_2m_mean.filter(v => v !== null);
 
           if (solars.length > 0) avgSolar = solars.reduce((a, b) => a + b, 0) / solars.length;
-          // MJ/m²/日 への単位変換 (J/m²で返る場合の安全策: 1MJ = 1,000,000J)
           if (avgSolar > 1000) avgSolar = avgSolar / 1000000; 
 
           if (temps.length > 0) avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
@@ -179,21 +204,20 @@ async function calculateWaterAndFertilizer() {
       }
     }
 
-    // 2. PAR（光合成有効放射）および群落受光率の計算（モンシ・サエキの理論ベース）
-    // 短波放射の約50%がPAR。大気透過率等を加味して係数0.48を適用
+    // 2. PAR（光合成有効放射）および群落受光率の計算
     const parTotal = avgSolar * 0.48; 
     const k = 0.7; // 消光係数
     const absorbedRatio = (1 - Math.exp(-k * lai)) * 100; // 受光率 (%)
     const absorbedPar = parTotal * (absorbedRatio / 100);
 
-    // 3. 蒸散量計算 (FAO-56概念・基礎蒸散係数 0.35 L/m²/MJ に気象補正を適用)
+    // 3. 蒸散量計算
     let tempStressFactor = 1.0;
     if (avgTemp > 25) {
-      tempStressFactor += (avgTemp - 25) * 0.03; // 高温による蒸散亢進
+      tempStressFactor += (avgTemp - 25) * 0.03;
     }
     let humStressFactor = 1.0;
     if (avgHum < 60) {
-      humStressFactor += (60 - avgHum) * 0.008; // 低湿度による蒸散亢進
+      humStressFactor += (60 - avgHum) * 0.008;
     }
 
     const transpirationM2Daily = absorbedPar * 0.35 * tempStressFactor * humStressFactor;
@@ -201,15 +225,14 @@ async function calculateWaterAndFertilizer() {
     const totalTranspirationL = totalTranspirationM2 * houseArea;
     const transpirationPerPlant = totalTranspirationL / totalPlants;
 
-    // 4. 給水量（潅水量）計算（安全余裕係数 1.15 を掛け合わせる）
+    // 4. 給水量（潅水量）計算
     const totalWaterL = totalTranspirationL * 1.15;
     const waterM2 = totalWaterL / houseArea;
     const waterPerPlant = waterM2 / (totalPlants / houseArea);
     const requiredMinutes = totalWaterL / flowRate;
     const waterTimeStr = formatMinutesToTime(requiredMinutes);
 
-    // 5. 液肥・施肥量計算（農研機構基準の標準窒素要求量および液肥成分比率に基づく）
-    // 選択液肥のスペック定義 (N%, P2O5%, K2O% および比重/希釈特性)
+    // 5. 液肥・施肥量計算
     const fertilizerSpecs = {
       black: { name: "トミー液肥ブラック", n: 0.10, p: 0.04, k: 0.06 },
       green: { name: "トミー液肥グリーン", n: 0.06, p: 0.08, k: 0.08 },
@@ -217,22 +240,19 @@ async function calculateWaterAndFertilizer() {
     };
     const currentFert = fertilizerSpecs[fertType] || fertilizerSpecs.black;
 
-    // 日射量に応じた期間内必要窒素量（kg / ハウス全体）の算定（標準ベース: 15.0MJで 1日あたり約 0.015kg N/m² 等を調整）
     const solarFactor = avgSolar / 15.0;
     const targetN_Kg = (houseArea * 0.0012 * intervalDays * solarFactor * (lai / 3.0)); 
     
-    // 選択液肥における必要使用量（kg）と液量（L）の算出
     const fertWeightKg = targetN_Kg / currentFert.n;
-    const fertLiters = fertWeightKg * 0.92; // 比重換算近似
+    const fertLiters = fertWeightKg * 0.92;
     const dilutionRatio = totalWaterL / (fertLiters > 0 ? fertLiters : 1);
 
-    // 6. 果実養分持ち出し量計算（収穫物乾物率4.0%、N:3.0%, P:1.0%, K:4.5%）
+    // 6. 果実養分持ち出し量計算
     const dryMatterKg = harvestKg * 0.04;
     const outN = dryMatterKg * 0.03;
     const outP = dryMatterKg * 0.01;
     const outK = dryMatterKg * 0.045;
 
-    // 供給成分量
     const supplyN = fertWeightKg * currentFert.n;
     const supplyP = fertWeightKg * currentFert.p;
     const supplyK = fertWeightKg * currentFert.k;
@@ -242,12 +262,11 @@ async function calculateWaterAndFertilizer() {
     const diffN = supplyN - outN;
     const nExportRatioVal = supplyN > 0 ? (outN / supplyN) * 100 : 0;
 
-    // 7. UIへの結果反映（DOM書き換え）
-    document.getElementById('summaryModeLabel').textContent = `${intervalDays}日間予測`;
+    // 7. UIへの結果反映
+    document.getElementById('summaryModeLabel').textContent = `${intervalDays}日分予測`;
     document.getElementById('summaryPeriodDates').textContent = `${startDateStr} 〜 ${endDateStr}`;
     document.getElementById('summaryPeriodDays').textContent = intervalDays;
 
-    // メトリックカード
     document.getElementById('cardTotalTranspirationL').textContent = Math.round(totalTranspirationL).toLocaleString();
     document.getElementById('cardTranspirationM2').textContent = totalTranspirationM2.toFixed(1);
     document.getElementById('cardTranspirationPlant').textContent = transpirationPerPlant.toFixed(2);
@@ -265,7 +284,6 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('cardDryMatter').textContent = dryMatterKg.toFixed(1);
     document.getElementById('cardHarvestKg').textContent = harvestKg.toFixed(1);
 
-    // SVGビジュアル内部のバインド
     document.getElementById('svgSolarVal').textContent = avgSolar.toFixed(1);
     document.getElementById('svgParVal').textContent = parTotal.toFixed(1);
     document.getElementById('svgLaiVal').textContent = lai.toFixed(1);
@@ -275,14 +293,12 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('svgTranspirationPlant').textContent = transpirationPerPlant.toFixed(2);
     document.getElementById('svgTranspirationTotal').textContent = Math.round(totalTranspirationL).toLocaleString();
 
-    // 液肥根拠ボード（SVG内）
     document.getElementById('svgFertSolarFactor').textContent = solarFactor.toFixed(2);
     document.getElementById('svgFertTargetN').textContent = targetN_Kg.toFixed(2);
     document.getElementById('svgFertNameBadge').textContent = currentFert.name;
     document.getElementById('svgFertResultKg').textContent = fertWeightKg.toFixed(1);
     document.getElementById('svgFertResultL').textContent = fertLiters.toFixed(1);
 
-    // バランス図（SVG内）
     document.getElementById('balanceFertLabel').textContent = currentFert.name;
     document.getElementById('balSupplyN').textContent = supplyN.toFixed(2);
     document.getElementById('balSupplyP').textContent = supplyP.toFixed(2);
@@ -297,7 +313,6 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('balOutTotal').textContent = outTotalNutrient.toFixed(2);
     document.getElementById('nExportRatio').textContent = nExportRatioVal.toFixed(1);
 
-    // プログレスバーおよびヘッダー表示用（ご要望の選択中液肥名・使用L数の動的反映）
     document.getElementById('barFertNameDisplay').textContent = currentFert.name;
     document.getElementById('barFertLDisplay').textContent = fertLiters.toFixed(1);
 
@@ -305,7 +320,6 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('barPVal').textContent = supplyP.toFixed(2);
     document.getElementById('barKVal').textContent = supplyK.toFixed(2);
 
-    // 一覧テーブル
     document.getElementById('resSolar').textContent = avgSolar.toFixed(1);
     document.getElementById('resSolarDetail').textContent = `(設定・取得元: ${sourceTempLabel})`;
     document.getElementById('resPAR').textContent = parTotal.toFixed(1);
@@ -321,7 +335,6 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('resDensity').textContent = (totalPlants / houseArea).toFixed(2);
     document.getElementById('resFlowRate').textContent = flowRate.toFixed(1);
 
-    // 計算結果エリアを表示
     document.getElementById('output').style.display = "block";
     document.getElementById('output').scrollIntoView({ behavior: 'smooth' });
 
@@ -331,9 +344,6 @@ async function calculateWaterAndFertilizer() {
   }
 }
 
-/**
- * 分単位の時間数（例: 75.5分）を "0時間 15分" 形式の文字列に変換する
- */
 function formatMinutesToTime(totalMinutes) {
   if (isNaN(totalMinutes) || totalMinutes <= 0) return "0分";
   const hours = Math.floor(totalMinutes / 60);
@@ -344,9 +354,6 @@ function formatMinutesToTime(totalMinutes) {
   return `${minutes}分`;
 }
 
-/**
- * Dateオブジェクトを "YYYY-MM-DD" 形式の文字列に変換する
- */
 function formatDateISO(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -354,9 +361,6 @@ function formatDateISO(date) {
   return `${y}-${m}-${d}`;
 }
 
-/**
- * 計算結果のサマリーカード領域をhtml2canvasを用いてPNG画像としてダウンロードする
- */
 function downloadSummaryPNG() {
   const targetElement = document.getElementById('output');
   if (!targetElement) return;
