@@ -202,11 +202,12 @@
         <circle cx="35" cy="30" r="16" fill="#ff9800"/>
         <circle cx="35" cy="30" r="20" fill="#ffc107" opacity="0.3"/>
         <line x1="55" y1="30" x2="100" y2="30" stroke="#f57c00" stroke-width="2.5" stroke-dasharray="3,2"/>
-        <text x="35" y="60" font-size="8" text-anchor="middle" font-weight="bold" fill="#d48800">全天日射 (Rs)</text>
+        <text x="35" y="60" font-size="8" text-anchor="middle" font-weight="bold" fill="#d48800"><tspan id="svgSolarTitle">全天日射 (Rs)</tspan></text>
         <text x="35" y="72" font-size="9" text-anchor="middle" font-weight="bold" fill="#d48800"><tspan id="svgSolarVal">0.0</tspan> MJ/m²</text>
-        
-        <text x="35" y="90" font-size="8" text-anchor="middle" font-weight="bold" fill="#2e7d32">PAR (光合成有効放射)</text>
-        <text x="35" y="102" font-size="9" text-anchor="middle" fill="#2e7d32"><tspan id="svgParVal">0.0</tspan> MJ/m²</text>
+        <text x="35" y="82" font-size="6.5" text-anchor="middle" fill="#a67c00">(日平均 <tspan id="svgSolarAvg">0.0</tspan>)</text>
+
+        <text x="35" y="94" font-size="8" text-anchor="middle" font-weight="bold" fill="#2e7d32"><tspan id="svgParTitle">PAR (光合成有効放射)</tspan></text>
+        <text x="35" y="106" font-size="9" text-anchor="middle" fill="#2e7d32"><tspan id="svgParVal">0.0</tspan> MJ/m²</text>
 
         <g transform="translate(112, 25)">
           <path d="M 25 10 Q 20 -5 25 -15" stroke="#00bcd4" stroke-width="2" fill="none" stroke-dasharray="2,2"/>
@@ -225,7 +226,7 @@
         <polygon points="213,56 221,60 213,64" fill="#00bcd4"/>
 
         <rect x="223" y="15" width="92" height="95" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
-        <text x="269" y="28" font-size="9.5" font-weight="bold" fill="#006064" text-anchor="middle">🍃 群落蒸散量</text>
+        <text x="269" y="28" font-size="9.5" font-weight="bold" fill="#006064" text-anchor="middle">🍃 群落蒸散量<tspan id="svgTranspPeriodNote" font-size="7"></tspan></text>
         <line x1="229" y1="33" x2="309" y2="33" stroke="#b2ebf2" stroke-width="1"/>
         <text x="269" y="47" font-size="11" font-weight="bold" fill="#00838f" text-anchor="middle"><tspan id="svgTranspirationM2">0.00</tspan> L/m²</text>
         <line x1="229" y1="54" x2="309" y2="54" stroke="#b2ebf2" stroke-width="1"/>
@@ -287,16 +288,17 @@
       </div>
       <div class="bar-container">
         <div class="bar-label"><span>窒素 (N)</span><span><strong id="barNVal">0</strong> kg</span></div>
-        <div class="progress-bg"><div id="barN" class="progress-fill fill-n" style="width: 100%;"></div></div>
+        <div class="progress-bg"><div id="barN" class="progress-fill fill-n" style="width: 0%;"></div></div>
       </div>
       <div class="bar-container">
         <div class="bar-label"><span>リン酸 (P₂O₅)</span><span><strong id="barPVal">0</strong> kg</span></div>
-        <div class="progress-bg"><div id="barP" class="progress-fill fill-p" style="width: 27%;"></div></div>
+        <div class="progress-bg"><div id="barP" class="progress-fill fill-p" style="width: 0%;"></div></div>
       </div>
       <div class="bar-container">
         <div class="bar-label"><span>カリウム (K₂O)</span><span><strong id="barKVal">0</strong> kg</span></div>
-        <div class="progress-bg"><div id="barK" class="progress-fill fill-k" style="width: 133%;"></div></div>
+        <div class="progress-bg"><div id="barK" class="progress-fill fill-k" style="width: 0%;"></div></div>
       </div>
+      <div style="font-size: 0.75em; color: #888; margin-top: 4px;">※ バーの長さは N・P・K のうち最大量を100%とした相対比です</div>
     </div>
 
     <div style="margin-bottom: 15px;">
@@ -306,7 +308,7 @@
           <tr>
             <th>短波放射 (Rs / GHI)</th>
             <td>
-              <span id="resSolar">0.0</span> MJ/m²/日 (期間平均)
+              期間平均 <span id="resSolar">0.0</span> MJ/m²/日 ／ 期間積算 <span id="resSolarTotal">0.0</span> MJ/m²
               <div id="resSolarDetail" style="font-size: 0.85em; color: #555; margin-top: 4px;"></div>
               <div id="resSolarDaily" style="font-size: 0.8em; color: #777; margin-top: 4px;"></div>
             </td>
@@ -314,15 +316,22 @@
           <tr>
             <th>PAR (光合成有効放射)</th>
             <td>
-              <span id="resPAR">0.0</span> MJ/m²/日 (期間平均)
+              期間平均 <span id="resPAR">0.0</span> MJ/m²/日 ／ 期間積算 <span id="resPARTotal">0.0</span> MJ/m²
               <div id="resPARDaily" style="font-size: 0.8em; color: #777; margin-top: 4px;"></div>
             </td>
           </tr>
           <tr>
-            <th>期間積算PAR / 吸収PAR</th>
+            <th>吸収PAR（群落吸収分）</th>
             <td>
-              積算PAR <span id="resPARTotal">0.0</span> MJ/m² (吸収PAR <span id="resAbsorbedParTotal">0.0</span> MJ/m²)
+              期間平均 <span id="resAbsorbedParAvg">0.0</span> MJ/m²/日 ／ 期間積算 <span id="resAbsorbedParTotal">0.0</span> MJ/m²
               <div id="resParTotalDaily" style="font-size: 0.8em; color: #777; margin-top: 4px;"></div>
+            </td>
+          </tr>
+          <tr>
+            <th>群落蒸散量</th>
+            <td>
+              期間平均 <span id="resTranspAvg">0.0</span> L/m²/日 ／ 期間積算 <span id="resTranspTotal">0.0</span> L/m²
+              （ハウス全体で <span id="resTranspTotalL">0</span> L）
             </td>
           </tr>
           <tr>
