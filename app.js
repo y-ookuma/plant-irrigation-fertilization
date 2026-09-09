@@ -166,16 +166,47 @@ function importParamsJSON(event) {
 }
 
 /**
- * Open-Meteo APIから指定期間の気象予報・実績データを非同期取得する
+ * Open-Meteo APIから指定期間の気象予報・実績データを非同期取得する。
+ * PARの直達光・散乱光分離モデル算定のため、日別データ（daily）に加え、
+ * 時間別（hourly）の直達日射（direct_radiation）・散乱日射（diffuse_radiation）も取得する。
+ * （Open-Meteoの daily パラメータには直達/散乱の分離集計値が存在しないため、
+ *   hourly値を日単位で積算してMJ/m²に変換し、分離モデルの入力として利用する）
  */
 async function fetchWeatherForecast(lat, lon, startDate, endDate) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=shortwave_radiation_sum,temperature_2m_mean,relative_humidity_2m_mean&timezone=Asia/Tokyo&start_date=${startDate}&end_date=${endDate}`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=shortwave_radiation_sum,temperature_2m_mean,relative_humidity_2m_mean&hourly=direct_radiation,diffuse_radiation&timezone=Asia/Tokyo&start_date=${startDate}&end_date=${endDate}`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error("気象データの取得に失敗しました (HTTP Status: " + response.status + ")");
   }
   const data = await response.json();
-  return data.daily;
+  return { daily: data.daily, hourly: data.hourly };
+}
+
+/**
+ * 時間別（hourly, 単位: W/m²）の直達日射・散乱日射データを、日付ごとに積算し
+ * MJ/m²/日の値へ変換する。
+ * W/m² は1時間分の平均放射照度であるため、1時間分の積算値は「W/m² × 3600秒」で
+ * J/m²（=Wh/m²×3600）となり、これを1,000,000で割ることでMJ/m²に変換する。
+ */
+function aggregateHourlyRadiationToDailyMJ(hourly) {
+  const directByDate = {};
+  const diffuseByDate = {};
+  if (!hourly || !hourly.time || !hourly.direct_radiation || !hourly.diffuse_radiation) {
+    return { directByDate, diffuseByDate };
+  }
+  for (let i = 0; i < hourly.time.length; i++) {
+    const dateKey = hourly.time[i].split('T')[0];
+    const directVal = hourly.direct_radiation[i];
+    const diffuseVal = hourly.diffuse_radiation[i];
+    if (!(dateKey in directByDate)) directByDate[dateKey] = 0;
+    if (!(dateKey in diffuseByDate)) diffuseByDate[dateKey] = 0;
+    if (directVal !== null && directVal !== undefined) directByDate[dateKey] += directVal;
+    if (diffuseVal !== null && diffuseVal !== undefined) diffuseByDate[dateKey] += diffuseVal;
+  }
+  // W/m²(1時間値)の日合計 → MJ/m²/日 に変換 (× 3600 / 1,000,000)
+  for (const d in directByDate) directByDate[d] = directByDate[d] * 3600 / 1000000;
+  for (const d in diffuseByDate) diffuseByDate[d] = diffuseByDate[d] * 3600 / 1000000;
+  return { directByDate, diffuseByDate };
 }
 
 /**
@@ -221,19 +252,25 @@ async function calculateWaterAndFertilizer() {
     let solarDaily = [];
     let tempDaily = [];
     let humDaily = [];
+    let directDaily = [];   // 直達日射 (MJ/m²/日、分離モデル用)
+    let diffuseDaily = [];  // 散乱日射 (MJ/m²/日、分離モデル用)
+    let parModelUsed = "flat"; // "split"(直達43%/散乱57%の分離モデル) or "flat"(簡易係数0.48・フォールバック)
 
     // 手動入力値があれば優先、なければOpen-Meteoから取得
+    // 手動入力の場合は直達・散乱の個別入力欄が無いため、分離モデルは使用せず簡易係数(0.48)で算出する。
     if (manualSolar !== "" && manualTemp !== "" && manualHum !== "") {
       avgSolar = parseFloat(manualSolar);
       avgTemp = parseFloat(manualTemp);
       avgHum = parseFloat(manualHum);
-      sourceTempLabel = "手動指定値";
+      sourceTempLabel = "手動指定値（直達/散乱の分離データなし）";
       solarDaily = dateList.map(() => avgSolar);
       tempDaily = dateList.map(() => avgTemp);
       humDaily = dateList.map(() => avgHum);
+      parModelUsed = "flat";
     } else {
       try {
-        const dailyData = await fetchWeatherForecast(lat, lon, startDateStr, endDateStr);
+        const weatherData = await fetchWeatherForecast(lat, lon, startDateStr, endDateStr);
+        const dailyData = weatherData.daily;
         if (dailyData && dailyData.shortwave_radiation_sum && dailyData.shortwave_radiation_sum.length > 0) {
           const convertSolar = (v) => (v !== null && v > 1000) ? v / 1000000 : v;
 
@@ -257,6 +294,17 @@ async function calculateWaterAndFertilizer() {
           if (dailyData.time && dailyData.time.length === dateList.length) {
             for (let i = 0; i < dateList.length; i++) dateList[i] = dailyData.time[i];
           }
+
+          // 時間別データから直達・散乱日射（MJ/m²/日）を日付ごとに集計し、分離モデルの入力とする
+          const { directByDate, diffuseByDate } = aggregateHourlyRadiationToDailyMJ(weatherData.hourly);
+          directDaily = dateList.map(d => (d in directByDate) ? directByDate[d] : null);
+          diffuseDaily = dateList.map(d => (d in diffuseByDate) ? diffuseByDate[d] : null);
+
+          // 全日付ぶん直達・散乱データが揃っている場合のみ分離モデルを使用。
+          // 一部でも欠測がある場合は、その日だけ簡易係数(0.48)にフォールバックする。
+          if (directDaily.some(v => v !== null) || diffuseDaily.some(v => v !== null)) {
+            parModelUsed = "split";
+          }
         } else {
           solarDaily = dateList.map(() => avgSolar);
           tempDaily = dateList.map(() => avgTemp);
@@ -271,15 +319,30 @@ async function calculateWaterAndFertilizer() {
       }
     }
 
-    // 2. PAR（光合成有効放射）および群落受光率の計算（1日あたりの値）
-    const parTotal = avgSolar * 0.48; 
+    // 2. PAR（光合成有効放射）および群落受光率の計算
+    // 直達日射(43%)・散乱日射(57%)を分離してPARを算出する分離モデルを基本とする。
+    // 直達/散乱データが取得できない日（手動入力時・API欠測時）は、簡易係数(Rs×0.48)にフォールバックする。
+    const DIRECT_PAR_COEF = 0.43;
+    const DIFFUSE_PAR_COEF = 0.57;
+    const FLAT_PAR_COEF = 0.48;
+
+    const parDaily = dateList.map((d, i) => {
+      const dVal = directDaily[i];
+      const fVal = diffuseDaily[i];
+      if (dVal !== undefined && dVal !== null && fVal !== undefined && fVal !== null) {
+        return dVal * DIRECT_PAR_COEF + fVal * DIFFUSE_PAR_COEF;
+      }
+      // その日だけ直達/散乱データが無い場合は簡易係数でフォールバック
+      return solarDaily[i] * FLAT_PAR_COEF;
+    });
+
     const k = 0.7; // 消光係数
     const absorbedRatio = (1 - Math.exp(-k * lai)) * 100; // 受光率 (%)
-    const absorbedPar = parTotal * (absorbedRatio / 100);
-
-    // 潅水(日分)の日数ぶん、日付ごとのPAR・吸収PARを算出（表示用）
-    const parDaily = solarDaily.map(v => v * 0.48);
     const absorbedParDaily = parDaily.map(v => v * (absorbedRatio / 100));
+
+    // 表示用の期間平均値（1日あたり）
+    const parTotal = parDaily.reduce((a, b) => a + b, 0) / parDaily.length;
+    const absorbedPar = absorbedParDaily.reduce((a, b) => a + b, 0) / absorbedParDaily.length;
 
     // 期間（intervalDays日分）の積算値。液肥使用量など他の指標が期間合計で
     // 出力されているのに合わせ、日射・PAR・吸収PARも期間積算で扱う。
@@ -419,6 +482,25 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('resSolarDetail').textContent = `(設定・取得元: ${sourceTempLabel})`;
     document.getElementById('resPAR').textContent = parTotal.toFixed(1);
     document.getElementById('resPARTotal').textContent = parPeriodTotal.toFixed(1);
+    document.getElementById('resParModelLabel').textContent = (parModelUsed === "split")
+      ? "直達43%/散乱57% 分離モデル"
+      : "簡易係数(Rs×0.48)フォールバック（直達/散乱データ欠測時・手動入力時）";
+
+    const directAvgDisplay = directDaily.filter(v => v !== null && v !== undefined);
+    const diffuseAvgDisplay = diffuseDaily.filter(v => v !== null && v !== undefined);
+    const directAvg = directAvgDisplay.length > 0 ? directAvgDisplay.reduce((a, b) => a + b, 0) / directAvgDisplay.length : 0;
+    const diffuseAvg = diffuseAvgDisplay.length > 0 ? diffuseAvgDisplay.reduce((a, b) => a + b, 0) / diffuseAvgDisplay.length : 0;
+    document.getElementById('resDirectAvg').textContent = directAvg.toFixed(1);
+    document.getElementById('resDiffuseAvg').textContent = diffuseAvg.toFixed(1);
+    document.getElementById('resDirectDiffuseDaily').innerHTML = dateList
+      .map((d, i) => {
+        const dv = directDaily[i], fv = diffuseDaily[i];
+        if (dv === null || dv === undefined || fv === null || fv === undefined) {
+          return `${formatDateShort(d)}: データ欠測のため簡易係数(0.48)で代替`;
+        }
+        return `${formatDateShort(d)}: 直達 ${dv.toFixed(1)} / 散乱 ${fv.toFixed(1)} MJ/m²/日`;
+      })
+      .join('<br>');
     document.getElementById('resAbsorbedParAvg').textContent = absorbedPar.toFixed(1);
     document.getElementById('resAbsorbedParTotal').textContent = absorbedParPeriodTotal.toFixed(1);
     document.getElementById('resTranspAvg').textContent = transpirationM2Daily.toFixed(2);
