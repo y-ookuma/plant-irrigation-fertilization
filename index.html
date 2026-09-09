@@ -18,12 +18,12 @@
     input[readonly] { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
     button { background: #28a745; color: white; border: none; padding: 14px; width: 100%; border-radius: 6px; font-size: 17px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: background 0.2s; }
     button:hover { background: #218838; }
-    .btn-secondary { background: #6c757d; margin-top: 5px; }
+    .btn-secondary { background: #6c757d; margin-top: 0; }
     .btn-secondary:hover { background: #5a6268; }
     .btn-png { background: #17a2b8; margin-top: 0; padding: 8px 16px; width: auto; font-size: 14px; }
     .btn-png:hover { background: #138496; }
     .json-flex { display: flex; gap: 10px; flex-wrap: wrap; }
-    .json-flex > div { flex: 1; min-width: 200px; }
+    .json-flex > button { flex: 1; min-width: 140px; }
     .result { background: #ffffff; border: 1px solid #28a745; border-radius: 10px; padding: 20px; margin-top: 20px; box-shadow: 0 4px 12px rgba(40,167,69,0.15); }
     .note { font-size: 0.85em; color: #666; font-weight: normal; }
     .summary-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 15px; }
@@ -72,14 +72,9 @@
   <div class="card" style="background: #eef9f1; border-color: #c3e6cb;">
     <h3 style="margin-top:0; color: #155724;">💾 設定パラメータの入出力 (JSON)</h3>
     <div class="json-flex">
-      <div>
-        <label>設定を出力 (エクスポート):</label>
-        <button type="button" class="btn-secondary" onclick="exportParamsJSON()">JSONファイルを保存</button>
-      </div>
-      <div>
-        <label>設定を読み込み (インポート):</label>
-        <input type="file" id="jsonFileInput" accept=".json" onchange="importParamsJSON(event)" style="padding: 7px;">
-      </div>
+      <button type="button" class="btn-secondary" onclick="exportParamsJSON()">📤 エクスポート</button>
+      <button type="button" class="btn-secondary" onclick="triggerImportJSON()">📥 インポート</button>
+      <input type="file" id="jsonFileInput" accept=".json" style="display: none;" onchange="importParamsJSON(event)">
     </div>
   </div>
 
@@ -91,7 +86,8 @@
     <label>経度 (Longitude):
       <input type="number" step="any" id="lon" value="139.6917">
     </label>
-    <button type="button" onclick="getCurrentLocation()">現在地から緯度経度を取得</button>
+    <div id="locationName" style="margin-top: 8px; font-size: 0.9em; color: #555;">地名: 未取得</div>
+    <button type="button" onclick="getCurrentLocation()">現在地から緯度経度・地名を自動取得</button>
   </div>
 
   <div class="card">
@@ -117,14 +113,14 @@
     <label>設備潅水量 (L/分):
       <input type="number" step="0.1" id="flowRate" value="50.0" required>
     </label>
-    <label>潅水周期 (日):
+    <label>潅水 (日分):
       <select id="intervalDays">
-        <option value="1">1日ごと (毎日)</option>
-        <option value="2">2日ごと (未来予測)</option>
-        <option value="3" selected>3日ごと (未来予測)</option>
-        <option value="4">4日ごと (未来予測)</option>
-        <option value="5">5日ごと (未来予測)</option>
-        <option value="7">7日ごと (未来予測)</option>
+        <option value="1">1日分</option>
+        <option value="2">2日分 (未来予測)</option>
+        <option value="3" selected>3日分 (未来予測)</option>
+        <option value="4">4日分 (未来予測)</option>
+        <option value="5">5日分 (未来予測)</option>
+        <option value="7">7日分 (未来予測)</option>
       </select>
     </label>
     <label>LAI (葉面積指数 m²/m²):
@@ -200,11 +196,9 @@
       </div>
     </div>
 
-    <!-- 統合・拡張された日射受光・群落光吸収図 ＆ 液肥根拠ビジュアル -->
     <div class="solar-visual-card">
       <div class="solar-visual-title">☀️ 日射受光（PARモデル）・群落光吸収図 ＆ 液肥使用量根拠</div>
       <svg width="100%" height="205" viewBox="0 0 320 205">
-        <!-- 太陽・全天日射 -->
         <circle cx="35" cy="30" r="16" fill="#ff9800"/>
         <circle cx="35" cy="30" r="20" fill="#ffc107" opacity="0.3"/>
         <line x1="55" y1="30" x2="100" y2="30" stroke="#f57c00" stroke-width="2.5" stroke-dasharray="3,2"/>
@@ -214,7 +208,6 @@
         <text x="35" y="90" font-size="8" text-anchor="middle" font-weight="bold" fill="#2e7d32">PAR (光合成有効放射)</text>
         <text x="35" y="102" font-size="9" text-anchor="middle" fill="#2e7d32"><tspan id="svgParVal">0.0</tspan> MJ/m²</text>
 
-        <!-- 植物群落 (LAI) -->
         <g transform="translate(112, 25)">
           <path d="M 25 10 Q 20 -5 25 -15" stroke="#00bcd4" stroke-width="2" fill="none" stroke-dasharray="2,2"/>
           <path d="M 40 10 Q 45 -5 40 -15" stroke="#00bcd4" stroke-width="2" fill="none" stroke-dasharray="2,2"/>
@@ -231,7 +224,6 @@
         <path d="M 188 60 L 213 60" stroke="#00bcd4" stroke-width="2.5" fill="none"/>
         <polygon points="213,56 221,60 213,64" fill="#00bcd4"/>
 
-        <!-- 群落蒸散量カード -->
         <rect x="223" y="15" width="92" height="95" rx="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
         <text x="269" y="28" font-size="9.5" font-weight="bold" fill="#006064" text-anchor="middle">🍃 群落蒸散量</text>
         <line x1="229" y1="33" x2="309" y2="33" stroke="#b2ebf2" stroke-width="1"/>
@@ -241,11 +233,9 @@
         <text x="269" y="78" font-size="8.5" font-weight="bold" fill="#2e7d32" text-anchor="middle"><tspan id="svgAbsorbedPar">0.0</tspan> MJ | <tspan id="svgTranspirationPlant">0.00</tspan>L</text>
         <text x="269" y="94" font-size="8" fill="#555" text-anchor="middle">(ハウス総: <tspan id="svgTranspirationTotal" font-weight="bold">0</tspan>L)</text>
 
-        <!-- 接続ライン（受光・日射から液肥根拠パネルへ） -->
         <path d="M 160 120 L 160 132 L 269 132 L 269 142" stroke="#28a745" stroke-width="2" fill="none" stroke-dasharray="2,2"/>
         <polygon points="265,142 269,150 273,142" fill="#28a745"/>
 
-        <!-- 選択液肥使用量の根拠ボード（SVG内追加） -->
         <rect x="15" y="134" width="290" height="64" rx="6" fill="#f0fff4" stroke="#52c41a" stroke-width="1.5"/>
         <text x="160" y="148" font-size="9.5" font-weight="bold" fill="#276749" text-anchor="middle">🧪 選択液肥使用量の根拠（日射連動・必要窒素モデル）</text>
         <text x="25" y="164" font-size="8.5" fill="#333">• 日射補正係数 (Rs/14): <tspan id="svgFertSolarFactor" font-weight="bold">1.00</tspan>倍</text>
@@ -331,7 +321,7 @@
     </div>
 
     <div class="info-box">
-      <h4>💡 計算式の根拠・モデル仕様と学術的背景</h4>
+      <h4>💡 計算式の根拠・モデル仕様と学術적背景</h4>
       <ul>
         <li><strong>PAR算定モデル:</strong> 短波放射量（Rs / GHI）を大気光学特性に基づき直達光成分（43%）と散乱光成分（57%）へ分離。それぞれ固有の分光特性係数を乗じて高精度にPARを算出します。</li>
         <li><strong>群落受光モデル（モンシ・サエキの理論）:</strong> 栽培植物の群落内における光の減衰を表現するランベルト・ベールの法則（Monsi & Saeki, 1953）に準拠。消光係数 k = 0.7 と葉面積指数（LAI）から群落受光率を動的に算出し、受光エネルギーを導出します。</li>
