@@ -79,15 +79,11 @@
   </div>
 
   <div class="card">
-    <h3>1. 位置情報設定</h3>
-    <label>緯度 (Latitude):
-      <input type="number" step="any" id="lat" value="35.6895">
-    </label>
-    <label>経度 (Longitude):
-      <input type="number" step="any" id="lon" value="139.6917">
-    </label>
-    <div id="locationName" style="margin-top: 8px; font-size: 0.9em; color: #555;">地名: 未取得</div>
-    <button type="button" onclick="getCurrentLocation()">現在地から緯度経度・地名を自動取得</button>
+    <h3>1. 位置情報設定 <span class="note">※現在地から自動取得</span></h3>
+    <input type="hidden" id="lat" value="35.6895">
+    <input type="hidden" id="lon" value="139.6917">
+    <div id="locationCoords" style="font-size: 0.95em; color: #333; font-weight: bold;">📍 座標: 取得中...</div>
+    <div id="locationName" style="margin-top: 6px; font-size: 0.9em; color: #555;">地名: 取得中...</div>
   </div>
 
   <div class="card">
@@ -306,13 +302,32 @@
           <tr>
             <th>短波放射 (Rs / GHI)</th>
             <td>
-              <span id="resSolar">0.0</span> MJ/m²/日
+              <span id="resSolar">0.0</span> MJ/m²/日 (期間平均)
               <div id="resSolarDetail" style="font-size: 0.85em; color: #555; margin-top: 4px;"></div>
+              <div id="resSolarDaily" style="font-size: 0.8em; color: #777; margin-top: 4px;"></div>
             </td>
           </tr>
-          <tr><th>PAR (光合成有効放射)</th><td><span id="resPAR">0.0</span> MJ/m²/日</td></tr>
-          <tr><th>期間積算PAR / 吸収PAR</th><td>積算PAR <span id="resPARTotal">0.0</span> MJ/m² (吸収PAR <span id="resAbsorbedParTotal">0.0</span> MJ/m²)</td></tr>
-          <tr><th>平均気温 / 湿度</th><td><span id="resTemp">0.0</span> °C (<span id="sourceTemp">--</span>) / <span id="resHum">0.0</span> %</td></tr>
+          <tr>
+            <th>PAR (光合成有効放射)</th>
+            <td>
+              <span id="resPAR">0.0</span> MJ/m²/日 (期間平均)
+              <div id="resPARDaily" style="font-size: 0.8em; color: #777; margin-top: 4px;"></div>
+            </td>
+          </tr>
+          <tr>
+            <th>期間積算PAR / 吸収PAR</th>
+            <td>
+              積算PAR <span id="resPARTotal">0.0</span> MJ/m² (吸収PAR <span id="resAbsorbedParTotal">0.0</span> MJ/m²)
+              <div id="resParTotalDaily" style="font-size: 0.8em; color: #777; margin-top: 4px;"></div>
+            </td>
+          </tr>
+          <tr>
+            <th>平均気温 / 湿度</th>
+            <td>
+              <span id="resTemp">0.0</span> °C (<span id="sourceTemp">--</span>) / <span id="resHum">0.0</span> %
+              <div id="resTempHumDaily" style="font-size: 0.8em; color: #777; margin-top: 4px;"></div>
+            </td>
+          </tr>
           <tr><th>葉面積指数 (LAI) / 群落受光率</th><td>LAI <span id="resLAI">0.0</span> (<span id="resAbsorbedRatio">0</span>% 受光)</td></tr>
           <tr><th>ハウス構造 / 栽培規模</th><td>面積 <span id="resArea">0</span> m² / 総株数 <span id="resTotalPlants">0</span> 株 (<span id="resDensity">0.0</span> 本/m²)</td></tr>
           <tr><th>設備潅水能力</th><td><span id="resFlowRate">0.0</span> L/分</td></tr>
