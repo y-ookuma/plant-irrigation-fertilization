@@ -271,7 +271,7 @@ async function calculateWaterAndFertilizer() {
       }
     }
 
-    // 2. PAR（光合成有効放射）および群落受光率の計算
+    // 2. PAR（光合成有効放射）および群落受光率の計算（1日あたりの値）
     const parTotal = avgSolar * 0.48; 
     const k = 0.7; // 消光係数
     const absorbedRatio = (1 - Math.exp(-k * lai)) * 100; // 受光率 (%)
@@ -280,6 +280,12 @@ async function calculateWaterAndFertilizer() {
     // 潅水(日分)の日数ぶん、日付ごとのPAR・吸収PARを算出（表示用）
     const parDaily = solarDaily.map(v => v * 0.48);
     const absorbedParDaily = parDaily.map(v => v * (absorbedRatio / 100));
+
+    // 期間（intervalDays日分）の積算値。液肥使用量など他の指標が期間合計で
+    // 出力されているのに合わせ、日射・PAR・吸収PARも期間積算で扱う。
+    const solarPeriodTotal = solarDaily.reduce((a, b) => a + b, 0);
+    const parPeriodTotal = parDaily.reduce((a, b) => a + b, 0);
+    const absorbedParPeriodTotal = absorbedParDaily.reduce((a, b) => a + b, 0);
 
     // 3. 蒸散量計算
     let tempStressFactor = 1.0;
@@ -355,12 +361,20 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('cardDryMatter').textContent = dryMatterKg.toFixed(1);
     document.getElementById('cardHarvestKg').textContent = harvestKg.toFixed(1);
 
-    document.getElementById('svgSolarVal').textContent = avgSolar.toFixed(1);
-    document.getElementById('svgParVal').textContent = parTotal.toFixed(1);
+    // 日射受光図は、液肥使用量など他の指標と同様に「期間(intervalDays日分)の積算値」で表示する。
+    // （日平均値は参考として小さく併記）
+    const periodNote = intervalDays > 1 ? `（${intervalDays}日分 積算）` : '（積算）';
+    document.getElementById('svgSolarTitle').textContent = `全天日射 (Rs) ${periodNote}`;
+    document.getElementById('svgParTitle').textContent = `PAR (光合成有効放射) ${periodNote}`;
+    document.getElementById('svgTranspPeriodNote').textContent = ` ${periodNote}`;
+
+    document.getElementById('svgSolarVal').textContent = solarPeriodTotal.toFixed(1);
+    document.getElementById('svgSolarAvg').textContent = avgSolar.toFixed(1) + ' MJ/m²/日';
+    document.getElementById('svgParVal').textContent = parPeriodTotal.toFixed(1);
     document.getElementById('svgLaiVal').textContent = lai.toFixed(1);
     document.getElementById('svgAbsorbedRatio').textContent = Math.round(absorbedRatio);
     document.getElementById('svgTranspirationM2').textContent = totalTranspirationM2.toFixed(2);
-    document.getElementById('svgAbsorbedPar').textContent = absorbedPar.toFixed(1);
+    document.getElementById('svgAbsorbedPar').textContent = absorbedParPeriodTotal.toFixed(1);
     document.getElementById('svgTranspirationPlant').textContent = transpirationPerPlant.toFixed(2);
     document.getElementById('svgTranspirationTotal').textContent = Math.round(totalTranspirationL).toLocaleString();
 
@@ -391,11 +405,25 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('barPVal').textContent = supplyP.toFixed(2);
     document.getElementById('barKVal').textContent = supplyK.toFixed(2);
 
+    // 棒ゲージの幅を実際の数値(N・P・Kの給液量)に基づいて算出する。
+    // これまでは数値表示だけ更新され、バーの幅がHTMLに固定値(100%/27%/133%)として
+    // ハードコードされたままだったため、数値とグラフが一致していなかった。
+    // N・P・Kのうち最大量を100%として、各成分の相対比でバーの長さを決定する。
+    const maxSupply = Math.max(supplyN, supplyP, supplyK, 0.0001);
+    document.getElementById('barN').style.width = Math.min(100, (supplyN / maxSupply) * 100).toFixed(1) + '%';
+    document.getElementById('barP').style.width = Math.min(100, (supplyP / maxSupply) * 100).toFixed(1) + '%';
+    document.getElementById('barK').style.width = Math.min(100, (supplyK / maxSupply) * 100).toFixed(1) + '%';
+
     document.getElementById('resSolar').textContent = avgSolar.toFixed(1);
+    document.getElementById('resSolarTotal').textContent = solarPeriodTotal.toFixed(1);
     document.getElementById('resSolarDetail').textContent = `(設定・取得元: ${sourceTempLabel})`;
     document.getElementById('resPAR').textContent = parTotal.toFixed(1);
-    document.getElementById('resPARTotal').textContent = (parTotal * intervalDays).toFixed(1);
-    document.getElementById('resAbsorbedParTotal').textContent = (absorbedPar * intervalDays).toFixed(1);
+    document.getElementById('resPARTotal').textContent = parPeriodTotal.toFixed(1);
+    document.getElementById('resAbsorbedParAvg').textContent = absorbedPar.toFixed(1);
+    document.getElementById('resAbsorbedParTotal').textContent = absorbedParPeriodTotal.toFixed(1);
+    document.getElementById('resTranspAvg').textContent = transpirationM2Daily.toFixed(2);
+    document.getElementById('resTranspTotal').textContent = totalTranspirationM2.toFixed(2);
+    document.getElementById('resTranspTotalL').textContent = Math.round(totalTranspirationL).toLocaleString();
     document.getElementById('resTemp').textContent = avgTemp.toFixed(1);
     document.getElementById('sourceTemp').textContent = sourceTempLabel;
     document.getElementById('resHum').textContent = avgHum.toFixed(1);
