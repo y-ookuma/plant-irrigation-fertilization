@@ -7,6 +7,7 @@
 // 初期化処理
 document.addEventListener('DOMContentLoaded', () => {
   updatePlantDensity();
+  initializeIrrigationDates();
   autoFetchLocation();
 });
 
@@ -113,13 +114,12 @@ function exportParamsJSON() {
     houseArea: document.getElementById('houseArea').value,
     totalPlants: document.getElementById('totalPlantsInput').value,
     flowRate: document.getElementById('flowRate').value,
-    intervalDays: document.getElementById('intervalDays').value,
+    irrigationStartDate: document.getElementById('irrigationStartDate').value,
+    irrigationEndDate: document.getElementById('irrigationEndDate').value,
     lai: document.getElementById('lai').value,
     fertilizerType: document.getElementById('fertilizerType').value,
     harvestKg: document.getElementById('harvestKg').value,
-    manualSolarRad: document.getElementById('manualSolarRad').value,
-    temperature: document.getElementById('temperature').value,
-    humidity: document.getElementById('humidity').value
+    manualSolarRad: document.getElementById('manualSolarRad').value
   };
 
   const blob = new Blob([JSON.stringify(params, null, 2)], { type: 'application/json' });
@@ -148,13 +148,13 @@ function importParamsJSON(event) {
       if (data.houseArea !== undefined) document.getElementById('houseArea').value = data.houseArea;
       if (data.totalPlants !== undefined) document.getElementById('totalPlantsInput').value = data.totalPlants;
       if (data.flowRate !== undefined) document.getElementById('flowRate').value = data.flowRate;
-      if (data.intervalDays !== undefined) document.getElementById('intervalDays').value = data.intervalDays;
+      if (data.irrigationStartDate !== undefined) document.getElementById('irrigationStartDate').value = data.irrigationStartDate;
+      if (data.irrigationEndDate !== undefined) document.getElementById('irrigationEndDate').value = data.irrigationEndDate;
       if (data.lai !== undefined) document.getElementById('lai').value = data.lai;
       if (data.fertilizerType !== undefined) document.getElementById('fertilizerType').value = data.fertilizerType;
       if (data.harvestKg !== undefined) document.getElementById('harvestKg').value = data.harvestKg;
       if (data.manualSolarRad !== undefined) document.getElementById('manualSolarRad').value = data.manualSolarRad;
-      if (data.temperature !== undefined) document.getElementById('temperature').value = data.temperature;
-      if (data.humidity !== undefined) document.getElementById('humidity').value = data.humidity;
+      initializeIrrigationDates();
 
       updatePlantDensity();
       alert("設定パラメータを正常に読み込みました。");
@@ -220,32 +220,48 @@ async function calculateWaterAndFertilizer() {
     const houseArea = parseFloat(document.getElementById('houseArea').value) || 1000;
     const totalPlants = parseFloat(document.getElementById('totalPlantsInput').value) || 3000;
     const flowRate = parseFloat(document.getElementById('flowRate').value) || 50.0;
-    const intervalDays = parseInt(document.getElementById('intervalDays').value) || 3;
+    const irrigationStartDate = document.getElementById('irrigationStartDate').value;
+    const irrigationEndDate = document.getElementById('irrigationEndDate').value;
+    const manualTemperature = document.getElementById('temperature').value;
+    const manualHumidity = document.getElementById('humidity').value;
     const lai = parseFloat(document.getElementById('lai').value) || 3.5;
     const fertType = document.getElementById('fertilizerType').value;
     const harvestKg = parseFloat(document.getElementById('harvestKg').value) || 0;
 
     const manualSolar = document.getElementById('manualSolarRad').value;
-    const manualTemp = document.getElementById('temperature').value;
-    const manualHum = document.getElementById('humidity').value;
 
-    // 期間日付の算出 (今日から intervalDays 分)
+    // 潅水期間の検証（開始日・終了日は本日を基準に前後14日間）
     const today = new Date();
-    const startDateStr = formatDateISO(today);
-    const targetDateObj = new Date(today);
-    targetDateObj.setDate(today.getDate() + (intervalDays - 1));
-    const endDateStr = formatDateISO(targetDateObj);
+    const todayStr = formatDateISO(today);
+    const minAllowedDate = addDays(today, -14);
+    const maxAllowedDate = addDays(today, 14);
+
+    if (!irrigationStartDate || !irrigationEndDate) {
+      throw new Error("潅水期間の開始日と終了日を選択してください。");
+    }
+    if (irrigationStartDate < formatDateISO(minAllowedDate) || irrigationStartDate > formatDateISO(maxAllowedDate) ||
+        irrigationEndDate < formatDateISO(minAllowedDate) || irrigationEndDate > formatDateISO(maxAllowedDate)) {
+      throw new Error("開始日・終了日は本日を基準に前後14日間の範囲で選択してください。");
+    }
+    if (irrigationStartDate > irrigationEndDate) {
+      throw new Error("終了日は開始日以降の日付を選択してください。");
+    }
+
+    const startDateStr = irrigationStartDate;
+    const endDateStr = irrigationEndDate;
+    const startObj = parseISODateLocal(startDateStr);
+    const endObj = parseISODateLocal(endDateStr);
+    const intervalDays = Math.floor((endObj - startObj) / 86400000) + 1;
 
     let avgSolar = 15.0;
     let avgTemp = 22.0;
     let avgHum = 70.0;
     let sourceTempLabel = "Open-Meteo予測平均";
 
-    // 潅水(日分)ぶんの日付リストをあらかじめ作成（後でAPI側の日付に置き換わる場合あり）
+    // 潅水期間の日付リスト
     const dateList = [];
     for (let i = 0; i < intervalDays; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
+      const d = addDays(startObj, i);
       dateList.push(formatDateISO(d));
     }
 
@@ -256,67 +272,68 @@ async function calculateWaterAndFertilizer() {
     let diffuseDaily = [];  // 散乱日射 (MJ/m²/日、分離モデル用)
     let parModelUsed = "flat"; // "split"(直達43%/散乱57%の分離モデル) or "flat"(簡易係数0.48・フォールバック)
 
-    // 手動入力値があれば優先、なければOpen-Meteoから取得
-    // 手動入力の場合は直達・散乱の個別入力欄が無いため、分離モデルは使用せず簡易係数(0.48)で算出する。
-    if (manualSolar !== "" && manualTemp !== "" && manualHum !== "") {
-      avgSolar = parseFloat(manualSolar);
-      avgTemp = parseFloat(manualTemp);
-      avgHum = parseFloat(manualHum);
-      sourceTempLabel = "手動指定値（直達/散乱の分離データなし）";
-      solarDaily = dateList.map(() => avgSolar);
+    // 短波放射だけ手動指定できる。平均気温・平均湿度は常にOpen-Meteoから取得する。
+    let weatherData = null;
+    try {
+      weatherData = await fetchWeatherForecast(lat, lon, startDateStr, endDateStr);
+      const dailyData = weatherData.daily;
+
+      if (dailyData && dailyData.time && dailyData.time.length > 0) {
+        if (manualSolar === "") {
+          const rawSolar = dailyData.shortwave_radiation_sum || [];
+          const convertSolar = (v) => (v !== null && v > 1000) ? v / 1000000 : v;
+          solarDaily = rawSolar.map(v => v !== null ? convertSolar(v) : null);
+        }
+
+        tempDaily = (dailyData.temperature_2m_mean || []).map(v => v !== null ? v : null);
+        humDaily = (dailyData.relative_humidity_2m_mean || []).map(v => v !== null ? v : null);
+
+        const solars = solarDaily.filter(v => v !== null && v !== undefined);
+        const temps = tempDaily.filter(v => v !== null && v !== undefined);
+        const hums = humDaily.filter(v => v !== null && v !== undefined);
+
+        if (solars.length > 0) avgSolar = solars.reduce((a, b) => a + b, 0) / solars.length;
+        if (temps.length > 0) avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
+        if (hums.length > 0) avgHum = hums.reduce((a, b) => a + b, 0) / hums.length;
+
+        // 欠測日は期間平均値で補完
+        solarDaily = solarDaily.map(v => v !== null && v !== undefined ? v : avgSolar);
+        tempDaily = tempDaily.map(v => v !== null && v !== undefined ? v : avgTemp);
+        humDaily = humDaily.map(v => v !== null && v !== undefined ? v : avgHum);
+
+        if (manualSolar !== "") sourceTempLabel = manualSolar && manualTemperature !== '' && manualHumidity !== ''
+        ? "短波放射・気温・湿度を手動指定"
+        : manualSolar
+          ? "短波放射を手動指定・気温/湿度はOpen-Meteo"
+          : (manualTemperature !== '' || manualHumidity !== '')
+            ? "気温/湿度を手動指定・短波放射はOpen-Meteo"
+            : "Open-Meteo" ;
+
+        // APIの返却日付を使用
+        if (dailyData.time && dailyData.time.length === dateList.length) {
+          for (let i = 0; i < dateList.length; i++) dateList[i] = dailyData.time[i];
+        }
+
+        const { directByDate, diffuseByDate } = aggregateHourlyRadiationToDailyMJ(weatherData.hourly);
+        directDaily = dateList.map(d => (d in directByDate) ? directByDate[d] : null);
+        diffuseDaily = dateList.map(d => (d in diffuseByDate) ? diffuseByDate[d] : null);
+
+        if (directDaily.some(v => v !== null) || diffuseDaily.some(v => v !== null)) {
+          parModelUsed = (manualSolar === "") ? "split" : "flat";
+        }
+      } else {
+        throw new Error("気象データが空です");
+      }
+    } catch (err) {
+      console.warn("気象API取得エラーのためデフォルト値を使用します: ", err.message);
+      sourceTempLabel = "通信エラー(デフォルト値使用)";
+      if (manualSolar === "") solarDaily = dateList.map(() => avgSolar);
+      else solarDaily = dateList.map(() => avgSolar);
       tempDaily = dateList.map(() => avgTemp);
       humDaily = dateList.map(() => avgHum);
+      directDaily = dateList.map(() => null);
+      diffuseDaily = dateList.map(() => null);
       parModelUsed = "flat";
-    } else {
-      try {
-        const weatherData = await fetchWeatherForecast(lat, lon, startDateStr, endDateStr);
-        const dailyData = weatherData.daily;
-        if (dailyData && dailyData.shortwave_radiation_sum && dailyData.shortwave_radiation_sum.length > 0) {
-          const convertSolar = (v) => (v !== null && v > 1000) ? v / 1000000 : v;
-
-          solarDaily = dailyData.shortwave_radiation_sum.map(v => v !== null ? convertSolar(v) : null);
-          tempDaily = dailyData.temperature_2m_mean.map(v => v !== null ? v : null);
-          humDaily = dailyData.relative_humidity_2m_mean.map(v => v !== null ? v : null);
-
-          const solars = solarDaily.filter(v => v !== null);
-          const temps = tempDaily.filter(v => v !== null);
-          const hums = humDaily.filter(v => v !== null);
-
-          if (solars.length > 0) avgSolar = solars.reduce((a, b) => a + b, 0) / solars.length;
-          if (temps.length > 0) avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
-          if (hums.length > 0) avgHum = hums.reduce((a, b) => a + b, 0) / hums.length;
-
-          // 欠測日は期間平均値で補完（表示・計算breakdown用）
-          solarDaily = solarDaily.map(v => v !== null ? v : avgSolar);
-          tempDaily = tempDaily.map(v => v !== null ? v : avgTemp);
-          humDaily = humDaily.map(v => v !== null ? v : avgHum);
-
-          if (dailyData.time && dailyData.time.length === dateList.length) {
-            for (let i = 0; i < dateList.length; i++) dateList[i] = dailyData.time[i];
-          }
-
-          // 時間別データから直達・散乱日射（MJ/m²/日）を日付ごとに集計し、分離モデルの入力とする
-          const { directByDate, diffuseByDate } = aggregateHourlyRadiationToDailyMJ(weatherData.hourly);
-          directDaily = dateList.map(d => (d in directByDate) ? directByDate[d] : null);
-          diffuseDaily = dateList.map(d => (d in diffuseByDate) ? diffuseByDate[d] : null);
-
-          // 全日付ぶん直達・散乱データが揃っている場合のみ分離モデルを使用。
-          // 一部でも欠測がある場合は、その日だけ簡易係数(0.48)にフォールバックする。
-          if (directDaily.some(v => v !== null) || diffuseDaily.some(v => v !== null)) {
-            parModelUsed = "split";
-          }
-        } else {
-          solarDaily = dateList.map(() => avgSolar);
-          tempDaily = dateList.map(() => avgTemp);
-          humDaily = dateList.map(() => avgHum);
-        }
-      } catch (err) {
-        console.warn("気象API取得エラーのためデフォルト値を使用します: ", err.message);
-        sourceTempLabel = "通信エラー(デフォルト値使用)";
-        solarDaily = dateList.map(() => avgSolar);
-        tempDaily = dateList.map(() => avgTemp);
-        humDaily = dateList.map(() => avgHum);
-      }
     }
 
     // 2. PAR（光合成有効放射）および群落受光率の計算
@@ -403,9 +420,10 @@ async function calculateWaterAndFertilizer() {
     const nExportRatioVal = supplyN > 0 ? (outN / supplyN) * 100 : 0;
 
     // 7. UIへの結果反映
-    document.getElementById('summaryModeLabel').textContent = `${intervalDays}日分予測`;
+    document.getElementById('summaryModeLabel').textContent = `${intervalDays}日分`;
     document.getElementById('summaryPeriodDates').textContent = `${startDateStr} 〜 ${endDateStr}`;
     document.getElementById('summaryPeriodDays').textContent = intervalDays;
+    document.getElementById('summaryCreatedDate').textContent = formatDateJapanese(today);
 
     document.getElementById('cardTotalTranspirationL').textContent = Math.round(totalTranspirationL).toLocaleString();
     document.getElementById('cardTranspirationM2').textContent = totalTranspirationM2.toFixed(1);
@@ -540,6 +558,60 @@ async function calculateWaterAndFertilizer() {
     alert("計算処理中にエラーが発生しました: " + error.message);
     console.error(error);
   }
+}
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function parseISODateLocal(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatDateJapanese(date) {
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function initializeIrrigationDates() {
+  const startEl = document.getElementById('irrigationStartDate');
+  const endEl = document.getElementById('irrigationEndDate');
+  if (!startEl || !endEl) return;
+
+  const today = new Date();
+  const minDate = formatDateISO(addDays(today, -14));
+  const maxDate = formatDateISO(addDays(today, 14));
+
+  startEl.min = minDate;
+  startEl.max = maxDate;
+  endEl.min = minDate;
+  endEl.max = maxDate;
+
+  const currentStart = startEl.value;
+  const currentEnd = endEl.value;
+
+  if (!currentStart || currentStart < minDate || currentStart > maxDate) {
+    startEl.value = formatDateISO(today);
+  }
+  if (!currentEnd || currentEnd < minDate || currentEnd > maxDate) {
+    endEl.value = formatDateISO(addDays(today, 2));
+  }
+
+  const syncEndMin = () => {
+    endEl.min = startEl.value || minDate;
+    if (endEl.value < endEl.min) endEl.value = endEl.min;
+  };
+  const syncStartMax = () => {
+    startEl.max = endEl.value || maxDate;
+    if (startEl.value > startEl.max) startEl.value = startEl.max;
+  };
+
+  startEl.onchange = syncEndMin;
+  endEl.onchange = syncStartMax;
+  syncEndMin();
+  syncStartMax();
 }
 
 function formatMinutesToTime(totalMinutes) {
