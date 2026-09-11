@@ -119,14 +119,23 @@ function exportParamsJSON() {
     lai: document.getElementById('lai').value,
     fertilizerType: document.getElementById('fertilizerType').value,
     harvestKg: document.getElementById('harvestKg').value,
-    manualSolarRad: document.getElementById('manualSolarRad').value
+    manualSolarRad: document.getElementById('manualSolarRad').value,
+    temperature: document.getElementById('temperature').value,
+    humidity: document.getElementById('humidity').value
   };
+
+  const defaultName = `キュウリ潅水施肥パラメータ_${new Date().toISOString().slice(0,10)}`;
+  let filename = prompt('保存するファイル名を入力してください（.jsonは自動で付きます）', defaultName);
+  if (filename === null) return;
+  filename = filename.replace(/[\\/:*?"<>|]/g, '_').trim();
+  if (!filename) filename = defaultName;
+  if (!filename.toLowerCase().endsWith('.json')) filename += '.json';
 
   const blob = new Blob([JSON.stringify(params, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `cucumber_irrigation_params_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -154,6 +163,8 @@ function importParamsJSON(event) {
       if (data.fertilizerType !== undefined) document.getElementById('fertilizerType').value = data.fertilizerType;
       if (data.harvestKg !== undefined) document.getElementById('harvestKg').value = data.harvestKg;
       if (data.manualSolarRad !== undefined) document.getElementById('manualSolarRad').value = data.manualSolarRad;
+      if (data.temperature !== undefined) document.getElementById('temperature').value = data.temperature;
+      if (data.humidity !== undefined) document.getElementById('humidity').value = data.humidity;
       initializeIrrigationDates();
 
       updatePlantDensity();
@@ -163,6 +174,7 @@ function importParamsJSON(event) {
     }
   };
   reader.readAsText(file);
+  event.target.value = '';
 }
 
 /**
@@ -222,8 +234,6 @@ async function calculateWaterAndFertilizer() {
     const flowRate = parseFloat(document.getElementById('flowRate').value) || 50.0;
     const irrigationStartDate = document.getElementById('irrigationStartDate').value;
     const irrigationEndDate = document.getElementById('irrigationEndDate').value;
-    const manualTemperature = document.getElementById('temperature').value;
-    const manualHumidity = document.getElementById('humidity').value;
     const lai = parseFloat(document.getElementById('lai').value) || 3.5;
     const fertType = document.getElementById('fertilizerType').value;
     const harvestKg = parseFloat(document.getElementById('harvestKg').value) || 0;
@@ -301,13 +311,7 @@ async function calculateWaterAndFertilizer() {
         tempDaily = tempDaily.map(v => v !== null && v !== undefined ? v : avgTemp);
         humDaily = humDaily.map(v => v !== null && v !== undefined ? v : avgHum);
 
-        if (manualSolar !== "") sourceTempLabel = manualSolar && manualTemperature !== '' && manualHumidity !== ''
-        ? "短波放射・気温・湿度を手動指定"
-        : manualSolar
-          ? "短波放射を手動指定・気温/湿度はOpen-Meteo"
-          : (manualTemperature !== '' || manualHumidity !== '')
-            ? "気温/湿度を手動指定・短波放射はOpen-Meteo"
-            : "Open-Meteo" ;
+        if (manualSolar !== "") sourceTempLabel = "短波放射のみ手動指定・気温/湿度はOpen-Meteo";
 
         // APIの返却日付を使用
         if (dailyData.time && dailyData.time.length === dateList.length) {
