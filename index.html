@@ -8,9 +8,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 680px; margin: 20px auto; padding: 15px; line-height: 1.5; color: #333; background-color: #f4f7f6; }
-    .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #28a745; padding-bottom: 8px; margin-bottom: 20px; }
-    h2 { color: #2c3e50; margin: 0; border-bottom: none; padding-bottom: 0; }
-    .btn-readme { background: #6c757d; color: white; padding: 6px 12px; border-radius: 5px; text-decoration: none; font-size: 0.85em; font-weight: bold; transition: background 0.2s; white-space: nowrap; }
+    .header-container { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 3px solid #28a745; padding-bottom: 8px; margin-bottom: 20px; }
+    h2 { color: #2c3e50; margin: 0; border-bottom: none; padding-bottom: 0; font-size: 1.8rem; line-height: 1.25; }
+    .btn-readme { background: #6c757d; color: white; padding: 4px 8px; border-radius: 4px; text-decoration: none; font-size: 0.75rem; font-weight: bold; transition: background 0.2s; white-space: nowrap; width: auto; margin: 0 0 0 auto; }
     .btn-readme:hover { background: #5a6268; }
     .readme-modal { display: none; position: fixed; z-index: 1000; inset: 0; background: rgba(0,0,0,0.55); padding: 20px; box-sizing: border-box; }
     .readme-modal.is-open { display: flex; align-items: center; justify-content: center; }
@@ -76,7 +76,9 @@
     .academic-box { background: #eef6fc; border: 1px solid #b8daff; border-radius: 6px; padding: 15px; margin-top: 15px; font-size: 0.85em; color: #004085; }
     .academic-box h4 { margin: 0 0 8px 0; color: #0056b3; display: flex; align-items: center; gap: 5px; }
     footer { text-align: center; margin-top: 30px; padding: 15px; font-size: 0.85em; color: #6c757d; border-top: 1px solid #dee2e6; }
-  </style>
+  /* README button compact override */
+  .btn-readme { margin-left: auto; flex: 0 0 auto; }
+</style>
 </head>
 <body>
 
@@ -414,6 +416,107 @@
 
   <script>
     // GitHub Pagesでは相対パスではなくGitHub RawからREADME.mdを取得
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function markdownInline(text) {
+  let s = escapeHtml(text);
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
+    '<img src="$2" alt="$1">');
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  s = s.replace(/_([^_]+)_/g, '<em>$1</em>');
+  return s;
+}
+
+function markdownToHtml(markdown) {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  let html = '';
+  let inCode = false;
+  let code = '';
+  let inList = false;
+  let listType = '';
+
+  const closeList = () => {
+    if (inList) {
+      html += `</${listType}>`;
+      inList = false;
+      listType = '';
+    }
+  };
+
+  for (const line of lines) {
+    if (line.trim().startsWith('```')) {
+      if (inCode) {
+        html += `<pre><code>${escapeHtml(code)}</code></pre>`;
+        code = '';
+        inCode = false;
+      } else {
+        closeList();
+        inCode = true;
+      }
+      continue;
+    }
+
+    if (inCode) {
+      code += line + '\n';
+      continue;
+    }
+
+    const h = line.match(/^(#{1,6})\s+(.+)$/);
+    if (h) {
+      closeList();
+      const level = h[1].length;
+      html += `<h${level}>${markdownInline(h[2])}</h${level}>`;
+      continue;
+    }
+
+    const li = line.match(/^\s*[-*+]\s+(.+)$/);
+    const oli = line.match(/^\s*\d+\.\s+(.+)$/);
+    if (li || oli) {
+      const type = li ? 'ul' : 'ol';
+      if (!inList || listType !== type) {
+        closeList();
+        html += `<${type}>`;
+        inList = true;
+        listType = type;
+      }
+      html += `<li>${markdownInline((li || oli)[1])}</li>`;
+      continue;
+    }
+
+    if (!line.trim()) {
+      closeList();
+      continue;
+    }
+
+    const quote = line.match(/^\s*>\s?(.*)$/);
+    if (quote) {
+      closeList();
+      html += `<blockquote>${markdownInline(quote[1])}</blockquote>`;
+      continue;
+    }
+
+    closeList();
+    html += `<p>${markdownInline(line)}</p>`;
+  }
+
+  closeList();
+  if (inCode) html += `<pre><code>${escapeHtml(code)}</code></pre>`;
+  return html;
+}
+
 async function openReadmeModal() {
       const modal = document.getElementById('readmeModal');
       const content = document.getElementById('readmeContent');
@@ -425,7 +528,7 @@ async function openReadmeModal() {
         const response = await fetch('https://raw.githubusercontent.com/y-ookuma/plant-irrigation-fertilization/refs/heads/main/README.md', { cache: 'no-cache' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const markdown = await response.text();
-        content.innerHTML = marked.parse(markdown);
+        content.innerHTML = markdownToHtml(markdown);
       } catch (error) {
         content.innerHTML = `<p style="color:#b00020;">README.md の読み込みに失敗しました。<br>${error.message}</p>`;
       }
