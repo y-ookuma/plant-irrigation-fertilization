@@ -12,6 +12,23 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
+ * タブ切り替え処理
+ * @param {string} tabId 表示するタブコンテンツの要素ID ('tab-input' または 'tab-output')
+ */
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+  const target = document.getElementById(tabId);
+  if (target) target.classList.add('active');
+
+  const btn = tabId === 'tab-output' ? document.getElementById('tabBtnOutput') : document.getElementById('tabBtnInput');
+  if (btn) btn.classList.add('active');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/**
  * ハウス面積と総株数から株数密度（本/m² および 本/坪）を自動計算して画面に反映する
  */
 function updatePlantDensity() {
@@ -556,7 +573,7 @@ async function calculateWaterAndFertilizer() {
     document.getElementById('resFlowRate').textContent = flowRate.toFixed(1);
 
     document.getElementById('output').style.display = "block";
-    document.getElementById('output').scrollIntoView({ behavior: 'smooth' });
+    switchTab('tab-output');
 
   } catch (error) {
     alert("計算処理中にエラーが発生しました: " + error.message);
@@ -658,4 +675,112 @@ function downloadSummaryPNG() {
   }).catch(err => {
     alert("PNG画像の生成に失敗しました: " + err.message);
   });
+}
+
+/**
+ * 1つのcanvasを、指定した最大高さ(px)ごとにページ分割してPDFへ追加する。
+ * （図表そのものが1ページより長い場合の最終手段としてのみ使用）
+ */
+function addCanvasPaginated(pdf, canvas, margin, imgWidthMm, pageHeightPx, pageHeight, startNewPageIfNeeded) {
+  let renderedPx = 0;
+  let lastSliceMm = 0;
+  let first = true;
+
+  while (renderedPx < canvas.height) {
+    const sliceHeightPx = Math.min(pageHeightPx, canvas.height - renderedPx);
+
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width = canvas.width;
+    pageCanvas.height = sliceHeightPx;
+    pageCanvas.getContext('2d').drawImage(
+      canvas,
+      0, renderedPx, canvas.width, sliceHeightPx,
+      0, 0, canvas.width, sliceHeightPx
+    );
+
+    const sliceHeightMm = (sliceHeightPx * imgWidthMm) / canvas.width;
+
+    if (!first || startNewPageIfNeeded) {
+      pdf.addPage('a4', 'p');
+    }
+    pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', margin, margin, imgWidthMm, sliceHeightMm);
+
+    renderedPx += sliceHeightPx;
+    lastSliceMm = sliceHeightMm;
+    first = false;
+  }
+
+  return margin + lastSliceMm; // このページ内でのカーソルY位置
+}
+
+/**
+ * サマリーをA4縦向きのPDFとして保存する。
+ * サマリー内の各ブロック（メトリクスカード、図、テーブルなど）を個別に画像化し、
+ * ページ内に収まらなくなったブロックはページ全体を新しいページへ送ることで、
+ * 図や文字が改ページ位置で途中で分断されないようにする。
+ * （1ブロック自体がA4 1ページより長い場合のみ、そのブロック内で分割する）
+ */
+async function downloadSummaryPDF() {
+  const targetElement = document.getElementById('output');
+  if (!targetElement) return;
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    alert("PDF生成ライブラリの読み込みに失敗しました。通信環境をご確認のうえ再度お試しください。");
+    return;
+  }
+
+  const pdfBtn = document.querySelector('.btn-pdf');
+  const originalBtnText = pdfBtn ? pdfBtn.textContent : null;
+  if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.textContent = '⏳ PDF生成中...'; }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4'); // A4縦向き
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 8; // mm
+    const usableWidth = pageWidth - margin * 2;
+    const usableHeight = pageHeight - margin * 2;
+    const imgWidthMm = usableWidth;
+    const blockGapMm = 4; // ブロック間の余白
+
+    // サマリー内の主要ブロック（見出し、指標カード群、図、テーブル等）を単位として扱う
+    const blocks = Array.from(targetElement.children);
+
+    let cursorY = margin;
+    let isPageEmpty = true;
+
+    for (const block of blocks) {
+      if (block.offsetParent === null) continue; // 非表示要素はスキップ
+
+      const canvas = await html2canvas(block, { scale: 2, useCORS: true });
+      const imgHeightMm = (canvas.height * imgWidthMm) / canvas.width;
+
+      if (imgHeightMm > usableHeight) {
+        // このブロック単体でも1ページに収まらない場合のみ、ブロック内で分割する
+        const pageHeightPx = (usableHeight * canvas.width) / imgWidthMm;
+        cursorY = addCanvasPaginated(pdf, canvas, margin, imgWidthMm, pageHeightPx, pageHeight, !isPageEmpty);
+        isPageEmpty = false;
+        continue;
+      }
+
+      // 残り余白に収まらない場合は、ブロックごと次ページへ送る（途中で切らない）
+      if (!isPageEmpty && cursorY + imgHeightMm > pageHeight - margin) {
+        pdf.addPage('a4', 'p');
+        cursorY = margin;
+        isPageEmpty = true;
+      }
+
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, cursorY, imgWidthMm, imgHeightMm);
+      cursorY += imgHeightMm + blockGapMm;
+      isPageEmpty = false;
+    }
+
+    pdf.save(`cucumber_irrigation_summary_${new Date().toISOString().slice(0,10)}.pdf`);
+  } catch (err) {
+    alert("PDFファイルの生成に失敗しました: " + err.message);
+  } finally {
+    if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.textContent = originalBtnText; }
+  }
 }
