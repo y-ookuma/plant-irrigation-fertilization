@@ -6,6 +6,7 @@
   <title>キュウリ 潅水・施肥量計算機</title>
   <link rel="icon" href="icons.png" type="image/png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 680px; margin: 20px auto; padding: 15px; line-height: 1.5; color: #333; background-color: #f4f7f6; }
     .header-container { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 3px solid #28a745; padding-bottom: 8px; margin-bottom: 20px; }
@@ -38,6 +39,15 @@
     .btn-secondary:hover { background: #5a6268; }
     .btn-png { background: #17a2b8; margin-top: 0; padding: 8px 16px; width: auto; font-size: 14px; }
     .btn-png:hover { background: #138496; }
+    .btn-pdf { background: #dc3545; margin-top: 0; padding: 8px 16px; width: auto; font-size: 14px; }
+    .btn-pdf:hover { background: #c82333; }
+    .summary-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 2px solid #dee2e6; }
+    .tab-btn { flex: 1; background: #e9ecef; color: #495057; border: none; border-radius: 8px 8px 0 0; padding: 12px 10px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 0; transition: background 0.2s, color 0.2s; }
+    .tab-btn:hover { background: #dde1e4; }
+    .tab-btn.active { background: #28a745; color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
     .json-flex { display: flex; gap: 10px; flex-wrap: wrap; }
     .json-flex > button { flex: 1; min-width: 140px; }
     .result { background: #ffffff; border: 1px solid #28a745; border-radius: 10px; padding: 20px; margin-top: 20px; box-shadow: 0 4px 12px rgba(40,167,69,0.15); }
@@ -86,6 +96,13 @@
     <h2>🥒 キュウリ 潅水・施肥量計算機</h2>
     <button type="button" class="btn-readme" onclick="openReadmeModal()">📖 説明書</button>
   </div>
+
+  <div class="tabs">
+    <button type="button" class="tab-btn active" id="tabBtnInput" onclick="switchTab('tab-input')"> パラメータ入力</button>
+    <button type="button" class="tab-btn" id="tabBtnOutput" onclick="switchTab('tab-output')">計算結果出力</button>
+  </div>
+
+  <div id="tab-input" class="tab-content active">
 
   <div class="card" style="background: #eef9f1; border-color: #c3e6cb;">
     <h3 style="margin-top:0; color: #155724;">💾 設定パラメータの入出力 (JSON)</h3>
@@ -172,6 +189,8 @@
 
   <button type="button" onclick="calculateWaterAndFertilizer()">🚀 計算実行</button>
 
+  </div>
+
   <div id="readmeModal" class="readme-modal" role="dialog" aria-modal="true" aria-labelledby="readmeModalTitle" onclick="if(event.target === this) closeReadmeModal()">
     <div class="readme-dialog">
       <div class="readme-dialog-header">
@@ -182,6 +201,8 @@
     </div>
   </div>
 
+  <div id="tab-output" class="tab-content">
+
   <div id="output" class="result" style="display:none;">
     <div class="summary-header">
       <div class="summary-title-area">
@@ -191,8 +212,9 @@
           📅 計算対象 (<span id="summaryModeLabel">当日</span>): <span id="summaryPeriodDates">----/--/-- 〜 ----/--/--</span> (<span id="summaryPeriodDays">0</span>日分)
         </div>
       </div>
-      <div>
+      <div class="summary-actions">
         <button type="button" class="btn-png" onclick="downloadSummaryPNG()">🖼 サマリーをPNG保存</button>
+        <button type="button" class="btn-pdf" onclick="downloadSummaryPDF()">📄 サマリーをPDF保存</button>
       </div>
     </div>
 
@@ -406,6 +428,8 @@
       </ul>
     </div>
   </div>
+
+  </div><!-- /#tab-output -->
 
   <footer>
     This project is licensed under the BSD 3-Clause License.<br>
